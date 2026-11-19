@@ -8,3 +8,12 @@ backend/models/
 .env
 backend/training/export/
 *.jsonl
+
+# Dataset (metadata and texts are versioned, audio and downloads are not)
+!dataset/**/*.jsonl
+dataset/raw/
+dataset/clips/**/*.wav
+dataset/sources/lrsc/**/*.wav
+dataset/sources/maloba/
+*.log
+!/kaikki.org-dictionary-Lingala.jsonl

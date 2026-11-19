@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OkapiAI</title>
+<style>
+:root{color-scheme:dark;--bg:#131814;--panel:#1c241f;--line:#34433a;--text:#f3f4ed;--muted:#abb9ad;--accent:#def695}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:1rem/1.55 system-ui,sans-serif}
+header{border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem clamp(1rem,4vw,3.5rem)}
+.brand{font-size:1.3rem;font-weight:750;letter-spacing:-.05em}.brand span{color:var(--accent)}
+.controls,.actions,.suggestions{display:flex;gap:.55rem;align-items:center;flex-wrap:wrap}
+button,select,textarea{font:inherit;color:inherit} button,select{min-height:2.65rem;background:var(--panel);border:1px solid var(--line);border-radius:.7rem;padding:.45rem .8rem;cursor:pointer}
+button:hover,select:hover{border-color:var(--accent)} button:disabled{opacity:.5;cursor:wait} :focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+main{width:min(100% - 2rem, 52rem);min-height:calc(100dvh - 5rem);margin:auto;display:flex;flex-direction:column}
+.intro{padding:clamp(2rem,10vh,7rem) 0 2rem}.intro h1{font:clamp(3rem,9vw,6rem)/.95 Georgia,serif;letter-spacing:-.065em;margin:0 0 1.1rem}
+.intro p,.meta{color:var(--muted)}.meta{font-size:.875rem}.suggestions{margin-top:1.25rem}
+#messages{display:grid;gap:1rem;margin:1.25rem 0;overflow-wrap:anywhere} article{border:1px solid var(--line);background:var(--panel);border-radius:1rem;padding:1rem 1.15rem;max-width:100%}
+article.user{justify-self:end;background:#2c392d;max-width:85%} article p{white-space:pre-wrap;margin:.45rem 0}
+.result{border-top:1px solid var(--line);padding:.65rem 0}.result:last-child{padding-bottom:0} audio{display:block;width:min(100%,22rem);height:2.6rem;margin-top:.45rem}
+form{position:sticky;bottom:0;margin-top:auto;padding:.8rem 0 1.15rem;background:var(--bg)}
+.composer{display:flex;align-items:flex-end;gap:.55rem;background:var(--panel);border:1px solid var(--line);border-radius:1rem;padding:.65rem}
+textarea{flex:1;min-width:0;min-height:3rem;resize:vertical;max-height:10rem;background:transparent;border:0;padding:.45rem}
+#send{background:var(--accent);color:#182014;font-weight:750;border-color:transparent} #notice{margin:.55rem 0 0;min-height:1.4em}
+@media(max-width:520px){header{align-items:flex-start}.controls{justify-content:flex-end}.composer button{padding:.4rem .55rem}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">Okapi<span>AI</span></div>
+  <div class="controls">
+    <select id="language" aria-label="Langue de réponse"><option value="fr">Français</option><option value="en">English</option></select>
+    <button id="voice" type="button" aria-pressed="false">Voix auto</button>
+  </div>
+</header>
+<main>
+  <section class="intro" id="intro">
+    <h1>Mbote !</h1>
+    <p id="description">Pose une question, explore le lingala et écoute les enregistrements du corpus.</p>
+    <div class="suggestions">
+      <button type="button">Que veut dire mbote ?</button>
+      <button type="button">Comment dit-on animal ?</button>
+      <button type="button">Kombo na ye nani ?</button>
+    </div>
+  </section>
+  <section id="messages" role="log" aria-label="Conversation"></section>
+  <form id="form">
+    <div class="composer">
+      <textarea id="message" aria-label="Message" placeholder="Écris ton message…" maxlength="2000" rows="1" required></textarea>
+      <button id="mic" type="button" aria-label="Dicter un message">Micro</button>
+      <button id="send">Envoyer</button>
+    </div>
+    <p id="notice" class="meta" role="status">Chargement du corpus…</p>
+  </form>
+</main>
+<script type="module">
+import { lingalaSpeech } from '/lingala.mjs';
+const byId = id => document.getElementById(id);
+const form = byId('form');
+const input = byId('message');
+const language = byId('language');
+const notice = byId('notice');
+const voice = byId('voice');
+const history = [];
+let status = {};
+let activeAudio;
+let speechRequest = 0;
+let pending = false;
+const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const mic = byId('mic');
+mic.disabled = !Recognition;
+if (!Recognition) mic.title = 'Dictée indisponible dans ce navigateur.';
+const locale = lang => lang === 'en' ? 'en-US' : 'fr-FR';
+const label = (fr, en) => language.value === 'en' ? en : fr;
+function showStatus() {
+  if (!status.entries) return;
+  const mode = status.model ? status.model : label('Recherche dans le corpus', 'Corpus search');
+  notice.textContent = mode + ' · ' + status.entries.toLocaleString(language.value) + label(' entrées · ', ' entries · ') +
+    status.recordings.toLocaleString(language.value) + label(' enregistrements · ', ' recordings · ') + (status.pico ? 'PicoTTS' : label('Voix du navigateur', 'Browser voice'));
+}
+fetch('/api/status').then(response => response.json()).then(data => { status = data; showStatus(); })
+  .catch(() => { notice.textContent = 'Serveur local indisponible.'; });
+language.addEventListener('change', () => {
+  document.documentElement.lang = language.value;
+  byId('description').textContent = label('Pose une question, explore le lingala et écoute les enregistrements du corpus.', 'Ask a question, explore Lingala and listen to recordings from the collection.');
+  input.placeholder = label('Écris ton message…', 'Type your message…');
+  byId('send').textContent = label('Envoyer', 'Send');
+  voice.textContent = label('Voix auto', 'Auto voice');
+  showStatus();
+});
+voice.addEventListener('click', () => {
+  const enabled = voice.getAttribute('aria-pressed') === 'false';
+  voice.setAttribute('aria-pressed', String(enabled));
+  if (!enabled) stopSpeech();
+  notice.textContent = enabled ? label('Lecture automatique activée.', 'Auto voice on.') : label('Lecture automatique désactivée.', 'Auto voice off.');
+});
+function stopSpeech() {
+  speechRequest += 1;
+  window.speechSynthesis?.cancel();
+  activeAudio?.pause();
+}
+async function speak(text, lang) {
+  stopSpeech();
+  const current = speechRequest;
+  if (status.pico) {
+    try {
+      const response = await fetch('/api/speak', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text.slice(0, 3500), language: lang }),
+      });
+      if (!response.ok) throw new Error('PicoTTS');
+      const wav = await response.blob();
+      if (current !== speechRequest) return;
+      const url = URL.createObjectURL(wav);
+      activeAudio = new Audio(url);
+      try { await activeAudio.play(); } finally { URL.revokeObjectURL(url); }
+      return;
+    } catch { if (current !== speechRequest) return; }
+  }
+  if (!window.speechSynthesis) {
+    notice.textContent = label('Lecture vocale indisponible.', 'Speech playback unavailable.');
+    return;
+  }
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = locale(lang);
+  const voices = speechSynthesis.getVoices().filter(item => item.lang.toLowerCase().startsWith(lang));
+  const preferred = voices.find(item => /^fr-(cd|cg)$/i.test(item.lang)) ||
+    voices.find(item => item.localService) || voices[0];
+  if (preferred) utterance.voice = preferred;
+  utterance.onerror = event => {
+    if (current === speechRequest && !['interrupted', 'canceled'].includes(event.error)) {
+      notice.textContent = label('La voix sélectionnée est indisponible.', 'The selected voice is unavailable.');
+    }
+  };
+  speechSynthesis.speak(utterance);
+}
+function speakLingala(text) {
+  stopSpeech();
+  if (!window.speechSynthesis) {
+    notice.textContent = label('Lecture vocale indisponible.', 'Speech playback unavailable.');
+    return;
+  }
+  const current = speechRequest;
+  const voices = speechSynthesis.getVoices();
+  const nativeVoice = voices.find(item => /^ln(?:-|$)/i.test(item.lang));
+  const frenchVoice = voices.find(item => /^fr-(cd|cg)$/i.test(item.lang)) ||
+    voices.find(item => /^fr(?:-|$)/i.test(item.lang) && item.localService) ||
+    voices.find(item => /^fr(?:-|$)/i.test(item.lang));
+  const segments = nativeVoice ? [{ text, pitch: 1 }] : lingalaSpeech(text);
+  let index = 0;
+  function next() {
+    if (current !== speechRequest || index >= segments.length) return;
+    const segment = segments[index++];
+    const utterance = new SpeechSynthesisUtterance(segment.text);
+    utterance.lang = nativeVoice?.lang || frenchVoice?.lang || 'fr-FR';
+    utterance.voice = nativeVoice || frenchVoice || null;
+    utterance.rate = nativeVoice ? 1 : 0.92;
+    utterance.pitch = segment.pitch;
+    utterance.onend = next;
+    utterance.onerror = event => {
+      if (current === speechRequest && !['interrupted', 'canceled'].includes(event.error)) {
+        notice.textContent = label('La voix est indisponible.', 'The voice is unavailable.');
+      }
+    };
+    speechSynthesis.speak(utterance);
+  }
+  next();
+}
+mic.addEventListener('click', () => {
+  const recognition = new Recognition();
+  recognition.lang = locale(language.value);
+  recognition.onresult = event => {
+    const transcript = event.results[0][0].transcript;
+    input.value = (input.value.trim() + ' ' + transcript).trim().slice(0, 2000);
+    input.focus();
+  };
+  recognition.onerror = () => { notice.textContent = label('Le navigateur n’a pas pu transcrire le micro.', 'The browser could not transcribe the microphone.'); };
+  recognition.onend = () => { mic.disabled = false; };
+  try { recognition.start(); mic.disabled = true; }
+  catch { recognition.onerror(); }
+});
+function append(parent, tag, text, className) {
+  const element = document.createElement(tag);
+  element.textContent = text;
+  if (className) element.className = className;
+  parent.append(element);
+  return element;
+}
+function card(role, text, lang) {
+  const item = append(byId('messages'), 'article', '', role);
+  append(item, 'strong', role === 'user' ? label('Toi', 'You') : 'OkapiAI');
+  item.lang = lang;
+  append(item, 'p', text);
+  return item;
+}
+form.addEventListener('submit', async event => {
+  event.preventDefault();
+  const message = input.value.trim();
+  if (!message || pending) return;
+  const lang = language.value;
+  const english = lang === 'en';
+  pending = true;
+  byId('send').disabled = true;
+  byId('intro').hidden = true;
+  input.value = '';
+  card('user', message, lang);
+  notice.textContent = label('Recherche en cours…', 'Searching…');
+  try {
+    const response = await fetch('/api/chat', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, language: lang, history: history.slice(-8) }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+    const item = card('assistant', data.reply, lang);
+    if (data.modelError) append(item, 'p', data.modelError, 'meta');
+    const primary = !data.generated ? data.results[0] : undefined;
+    let primaryClip;
+    const readAnswer = () => {
+      if (primaryClip) {
+        stopSpeech();
+        primaryClip.currentTime = 0;
+        primaryClip.play().catch(() => { if (primary.lingala) speakLingala(primary.lingala); });
+      } else if (primary?.lingala) {
+        speakLingala(primary.lingala);
+      } else {
+        speak(primary?.text || data.reply, lang);
+      }
+    };
+    const play = append(item, 'button', primary?.lingala
+      ? (english ? 'Listen in Lingala' : 'Écouter en lingala') : (english ? 'Listen' : 'Écouter'));
+    play.type = 'button';
+    play.addEventListener('click', readAnswer);
+    for (const result of data.results) {
+      const row = append(item, 'div', '', 'result');
+      append(row, 'div', result.source, 'meta');
+      append(row, 'p', result.text);
+      if (result.clip !== undefined) {
+        const clip = append(row, 'audio', '');
+        clip.controls = true;
+        clip.preload = 'none';
+        clip.src = '/audio/' + result.clip;
+        if (result === primary) primaryClip = clip;
+        clip.addEventListener('play', stopSpeech);
+      } else if (result.lingala && result.lingala !== primary?.lingala) {
+        const pronounce = append(row, 'button', english ? 'Pronounce in Lingala' : 'Prononcer en lingala');
+        pronounce.type = 'button';
+        pronounce.addEventListener('click', () => speakLingala(result.lingala));
+      }
+    }
+    history.push({ role: 'user', content: message }, { role: 'assistant', content: data.reply.slice(0, 2000) });
+    if (voice.getAttribute('aria-pressed') === 'true') readAnswer();
+    showStatus();
+  } catch (error) {
+    notice.textContent = error.message;
+    input.value = message;
+  } finally {
+    pending = false;
+    byId('send').disabled = false;
+    input.focus();
+    form.scrollIntoView({ block: 'end' });
+  }
+});
+for (const button of document.querySelectorAll('.suggestions button')) {
+  button.addEventListener('click', () => { input.value = button.textContent; form.requestSubmit(); });
+}
+</script>
+</body>
+</html>

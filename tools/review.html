@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Okapi – Révision</title>
+<style>
+  :root { --bg:#f7f6f2; --card:#fff; --ink:#1d1d1b; --mute:#6b6a64; --line:#e2e0d8; --ln:#1f7a4d; --lnbg:#e3f3ea; --acc:#c2410c; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#151513; --card:#1f1f1c; --ink:#ecebe6; --mute:#9d9b93; --line:#33322d; --ln:#6fd19e; --lnbg:#1c3428; --acc:#fb923c; } }
+  * { box-sizing:border-box }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.45 system-ui, sans-serif }
+  header { position:sticky; top:0; background:var(--bg); border-bottom:1px solid var(--line); padding:10px 16px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; z-index:2 }
+  header h1 { font-size:16px; margin:0 12px 0 0 }
+  select, button, input[type=text] { font:inherit; color:inherit; background:var(--card); border:1px solid var(--line); border-radius:6px; padding:6px 8px }
+  button { cursor:pointer } button.primary { background:var(--ln); color:#fff; border-color:var(--ln) }
+  #stats { color:var(--mute); margin-left:auto }
+  main { max-width:900px; margin:0 auto; padding:16px }
+  .clip { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:12px }
+  .clip.done { opacity:.6 }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap }
+  .tag { font-size:12px; padding:1px 8px; border-radius:99px; border:1px solid var(--line); color:var(--mute) }
+  .tag.ln { background:var(--lnbg); color:var(--ln); border-color:transparent }
+  .asr { margin:8px 0; color:var(--mute) } .asr .w-ln { color:var(--ln); font-weight:600; background:var(--lnbg); border-radius:3px; padding:0 2px }
+  .hint { font-size:13px; color:var(--mute); margin:4px 0 } .hint b { color:var(--ink) }
+  label { display:block; font-size:12px; color:var(--mute); margin-top:6px }
+  input[type=text] { width:100% }
+  audio { height:32px; max-width:100% }
+  .keys { font-size:12px; color:var(--mute) }
+</style>
+</head>
+<body>
+<header>
+  <h1>Okapi · Révision</h1>
+  <select id="video"></select>
+  <select id="filter">
+    <option value="ln,mixte">Lingala + mixte</option>
+    <option value="ln">Lingala seulement</option>
+    <option value="mixte">Mixte</option>
+    <option value="fr">Français</option>
+    <option value="all">Tout</option>
+  </select>
+  <label style="margin:0"><input type="checkbox" id="todo" checked> à revoir seulement</label>
+  <span id="stats"></span>
+</header>
+<main id="list"></main>
+<p class="keys" style="text-align:center">Entrée = enregistrer · Ctrl+Espace = rejouer le clip en cours</p>
+<script>
+const $ = s => document.querySelector(s);
+let rows = [], current = null;
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+async function loadVideos() {
+  const v = await (await fetch("/api/videos")).json();
+  $("#video").innerHTML = v.map(x => `<option value="${x.id}">${esc(x.title)}</option>`).join("");
+  try { const last = localStorage.getItem("okapi-video"); if (last && v.some(x => x.id === last)) $("#video").value = last; } catch {}
+  loadClips();
+}
+async function loadClips() {
+  try { localStorage.setItem("okapi-video", $("#video").value); } catch {}
+  rows = await (await fetch("/api/clips?id=" + $("#video").value)).json();
+  render();
+}
+function render() {
+  const f = $("#filter").value, todo = $("#todo").checked;
+  const shown = rows.filter(r => (f === "all" || f.split(",").includes(r.lang || "fr")) && (!todo || r.needs_review));
+  const done = rows.filter(r => !r.needs_review).length;
+  $("#stats").textContent = `${shown.length} affichés · ${done}/${rows.length} validés`;
+  $("#list").innerHTML = shown.slice(0, 150).map((r, i) => {
+    const words = (r.words || []).map(w => w.lang === "ln" ? `<span class="w-ln">${esc(w.w)}</span>` : esc(w.w)).join(" ") || esc(r.asr_fr);
+    const mms = (r.ln_mms || []).map(s => `<div class="hint">MMS : <b>${esc(s.mms)}</b>${s.lexique?.length ? " → lexique : " + s.lexique.map(l => `<b>${esc(l.lingala)}</b> = ${esc(l.francais)}`).join(", ") : ""}</div>`).join("");
+    return `<div class="clip ${r.needs_review ? "" : "done"}" data-i="${rows.indexOf(r)}">
+      <div class="row"><audio controls preload="none" src="/${esc(r.audio)}"></audio>
+        <span class="tag ${r.lang === "ln" ? "ln" : ""}">${esc(r.lang || "?")}</span>
+        <span class="tag">${r.start.toFixed(1)}s</span>
+        <select class="lang"><option>fr</option><option>ln</option><option>mixte</option></select></div>
+      <div class="asr">${words}</div>${mms}
+      <label>Lingala (orthographe correcte)</label><input type="text" class="ln" value="${esc(r.lingala)}">
+      <label>Français</label><input type="text" class="fr" value="${esc(r.francais)}">
+      <div class="row" style="margin-top:8px"><button class="primary save">Valider</button><button class="skip">Ignorer (inutilisable)</button></div>
+    </div>`;
+  }).join("");
+  document.querySelectorAll(".clip").forEach(el => {
+    const r = rows[el.dataset.i];
+    el.querySelector(".lang").value = r.lang || "fr";
+    el.addEventListener("focusin", () => current = el);
+    el.querySelector(".save").onclick = () => save(el, false);
+    el.querySelector(".skip").onclick = () => save(el, true);
+    el.querySelectorAll("input[type=text]").forEach(inp => inp.addEventListener("keydown", e => { if (e.key === "Enter") save(el, false); }));
+  });
+}
+async function save(el, skip) {
+  const r = rows[el.dataset.i];
+  const body = { video_id: r.video_id, audio: r.audio, lang: skip ? "rejet" : el.querySelector(".lang").value,
+    lingala: el.querySelector(".ln").value.trim(), francais: el.querySelector(".fr").value.trim(), needs_review: false };
+  const res = await fetch("/api/save", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body) });
+  if (!res.ok) { alert("Erreur d'enregistrement"); return; }
+  Object.assign(r, body);
+  const next = el.nextElementSibling;
+  el.classList.add("done");
+  if (next) { next.querySelector("input[type=text]").focus(); next.querySelector("audio").play(); }
+  const done = rows.filter(r => !r.needs_review).length;
+  $("#stats").textContent = $("#stats").textContent.replace(/\d+\/\d+ validés/, `${done}/${rows.length} validés`);
+}
+document.addEventListener("keydown", e => {
+  if (e.ctrlKey && e.code === "Space" && current) { e.preventDefault(); const a = current.querySelector("audio"); a.currentTime = 0; a.play(); }
+});
+$("#video").onchange = loadClips; $("#filter").onchange = render; $("#todo").onchange = render;
+loadVideos();
+</script>
+</body>
+</html>
