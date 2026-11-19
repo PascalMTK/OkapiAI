@@ -51,6 +51,9 @@ function renderAccount() {
     el.innerHTML = `<button id="login-btn">Se connecter</button>`;
     $("#login-btn").onclick = openLogin;
   }
+  if (!state.user?.is_admin && $("#tab-admin")?.classList.contains("active")) {
+    $('nav [data-tab="chat"]').click();  // plus admin : on quitte le panneau
+  }
   $("#admin-tab").hidden = !state.user?.is_admin;
 }
 
@@ -69,9 +72,14 @@ $("#login-form").addEventListener("submit", async (e) => {
   try {
     const data = await api(`/api/auth/${action === "register" ? "register" : "login"}`,
       { method: "POST", json: { username: f.get("username"), password: f.get("password") } });
+    const fromAdmin = onAdminUrl();
     setSession(data);
     $("#login-dialog").close();
     e.target.reset();
+    if (fromAdmin) {
+      if (state.user?.is_admin) $("#admin-tab").click();
+      else alert(`Le compte « ${state.user.username} » n'est pas administrateur : le panneau admin lui est fermé.`);
+    }
   } catch (err) { $("#login-msg").textContent = err.message; $("#login-msg").className = "msg err"; }
 });
 
@@ -80,8 +88,26 @@ const tabLoaders = {};
 $$("nav button").forEach((b) => b.addEventListener("click", () => {
   $$("nav button").forEach((x) => x.classList.toggle("active", x === b));
   $$(".tab").forEach((t) => t.classList.toggle("active", t.id === `tab-${b.dataset.tab}`));
+  // l'adresse suit l'onglet : /admin pour le panneau admin, / pour le reste
+  const path = b.dataset.tab === "admin" ? "/admin" : "/";
+  if (location.pathname !== path) history.replaceState(null, "", path);
   tabLoaders[b.dataset.tab]?.();
 }));
+
+// ---------- Lien direct /admin ----------
+const onAdminUrl = () => location.pathname.replace(/\/+$/, "") === "/admin";
+function openAdminFromUrl() {
+  if (state.user?.is_admin) { $("#admin-tab").click(); return; }
+  // pas (encore) admin : on montre le panneau verrouillé et on propose la connexion
+  $$("nav button").forEach((x) => x.classList.remove("active"));
+  $$(".tab").forEach((t) => t.classList.toggle("active", t.id === "tab-admin"));
+  loadAdmin();
+  openLogin();
+  $("#login-msg").textContent = state.user
+    ? `Le compte « ${state.user.username} » n'est pas administrateur. Connectez-vous avec un compte admin.`
+    : "Connectez-vous avec un compte administrateur pour accéder au panneau.";
+  $("#login-msg").className = "msg";
+}
 
 function fillLangSelects() {
   const opts = (filter) => state.langs.filter(filter).map((l) => `<option value="${l.code}">${esc(l.name)}</option>`).join("");
@@ -456,7 +482,33 @@ $("#learn-lang").addEventListener("change", showCards);
 tabLoaders.learn = showCards;
 
 // ---------- Admin ----------
+const EMPTY_ADMIN = {
+  en_attente_admin: (s) => `Aucune proposition n'attend votre validation.<br>
+    Une proposition arrive ici quand <b>${s.min_similar} personnes différentes</b> ont envoyé une traduction ou un dialogue similaire.
+    ${s.propositions.collecte ? `<br>${s.propositions.collecte} proposition(s) sont en cours de collecte : choisissez « En collecte » pour les voir.`
+      : "<br>Aucune contribution pour l'instant : commencez par l'onglet « Contribuer »."}`,
+  collecte: () => "Aucune proposition en cours de collecte.",
+  approuve: () => "Aucune proposition approuvée pour l'instant.",
+  rejete: () => "Aucune proposition rejetée.",
+};
+
 async function loadAdmin() {
+  if (!state.user?.is_admin) {
+    $("#admin-stats").innerHTML = "";
+    $("#admin-list").innerHTML = `<div class="card"><p>🔒 Connectez-vous avec un compte administrateur pour accéder à ce panneau.</p></div>`;
+    return;
+  }
+  $("#admin-list").innerHTML = `<p class="muted">Chargement…</p>`;
+  try {
+    await renderAdmin();
+  } catch (err) {
+    $("#admin-list").innerHTML = `<div class="card"><p class="msg err">⚠️ Impossible de charger le panneau admin : ${esc(err.message)}</p>
+      <button type="button" class="secondary" id="admin-retry">Réessayer</button></div>`;
+    $("#admin-retry").onclick = loadAdmin;
+  }
+}
+
+async function renderAdmin() {
   const s = await api("/api/admin/stats");
   const P = s.propositions;
   $("#admin-stats").innerHTML = [
@@ -480,21 +532,29 @@ async function loadAdmin() {
       ${p.audios.map((a) => `<div class="muted">🎙️ ${esc(a.user)} <audio controls preload="none" src="${esc(withToken(a.url))}"></audio></div>`).join("")}
       ${pending ? `<div class="row" style="margin-top:8px"><button data-act="approve">✅ Approuver → dataset d'entraînement</button>
         <button class="danger" data-act="reject">✖ Rejeter</button></div>` : ""}
-    </div>`).join("") : `<p class="muted">Rien à afficher.</p>`;
+    </div>`).join("") : `<div class="card"><p class="muted">${EMPTY_ADMIN[status]?.(s) || "Rien à afficher."}</p></div>`;
 
-  $$("[data-act]").forEach((b) => (b.onclick = async () => {
+  $$("#admin-list [data-act]").forEach((b) => (b.onclick = async () => {
     const card = b.closest("[data-pid]");
-    const json = b.dataset.act === "approve"
-      ? { source_text: $(".a-src", card).value, target_text: $(".a-tgt", card).value }
-      : { note: prompt("Raison du rejet (optionnel)") || null };
-    try { await api(`/api/admin/propositions/${card.dataset.pid}/${b.dataset.act}`, { method: "POST", json }); loadAdmin(); }
+    let json;
+    if (b.dataset.act === "approve") {
+      json = { source_text: $(".a-src", card).value.trim(), target_text: $(".a-tgt", card).value.trim() };
+      if (!json.source_text || !json.target_text) return alert("Les deux textes sont obligatoires.");
+    } else {
+      const note = prompt("Raison du rejet (optionnel) :", "");
+      if (note === null) return;  // « Annuler » : on ne rejette pas
+      json = { note: note.trim() || null };
+    }
+    $$("button", card).forEach((x) => (x.disabled = true));
+    try { await api(`/api/admin/propositions/${card.dataset.pid}/${b.dataset.act}`, { method: "POST", json }); }
     catch (err) { alert(err.message); }
+    loadAdmin();
   }));
 }
 $("#admin-status").addEventListener("change", loadAdmin);
 $("#admin-export").onclick = async () => {
   const res = await fetch("/api/admin/export/entrainement.jsonl", { headers: { Authorization: `Bearer ${state.token}` } });
-  if (!res.ok) return alert("Export impossible");
+  if (!res.ok) return alert(`Export impossible (erreur ${res.status}). Reconnectez-vous puis réessayez.`);
   const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(await res.blob()), download: "okapi_entrainement.jsonl" });
   a.click();
 };
@@ -524,5 +584,8 @@ tabLoaders.admin = loadAdmin;
     $("#ai-badge").title = f.ai_conversation ? "" : "Activez l'IA côté serveur (clé ANTHROPIC_API_KEY) pour converser librement";
   }).catch(() => {});
   updateVoiceHint();
-  if (state.token) api("/api/auth/me").then((u) => setSession({ token: state.token, user: u })).catch(() => {});
+  const afterSession = () => { if (onAdminUrl()) openAdminFromUrl(); };
+  if (state.token) {
+    api("/api/auth/me").then((u) => setSession({ token: state.token, user: u })).catch(() => {}).finally(afterSession);
+  } else afterSession();
 })();

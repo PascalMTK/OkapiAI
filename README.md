@@ -64,7 +64,11 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-Ouvrez **http://localhost:8000**. La documentation interactive de l'API est disponible sur **http://localhost:8000/docs**.
+| Adresse | Page |
+|---|---|
+| **http://localhost:8000** | Application (chat, voix, contributions, apprentissage) |
+| **http://localhost:8000/admin** | Panneau d'administration |
+| **http://localhost:8000/docs** | Documentation interactive de l'API |
 
 > [!IMPORTANT]
 > Un compte administrateur `admin` / `admin123` est créé au premier démarrage.

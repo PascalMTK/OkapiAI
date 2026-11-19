@@ -61,6 +61,17 @@ app = FastAPI(title="OkapiAI", version="0.1.0", lifespan=lifespan,
 for r in (auth.router, chat.router, contributions.router, learn.router, admin.router):
     app.include_router(r)
 
+
+@app.middleware("http")
+async def revalidate_frontend(request, call_next):
+    """Le navigateur doit revérifier l'interface à chaque visite : après une mise à jour,
+    une ancienne version de app.js en cache ne casse plus la page."""
+    response = await call_next(request)
+    if not request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 @app.get("/api/features")
 def features():
     return {"ai_conversation": claude_chat.enabled(),
@@ -84,6 +95,13 @@ def get_audio(name: str, token: Optional[str] = None, db: Session = Depends(get_
         if not (user and (user.is_admin or owner)):
             raise HTTPException(403, "Audio non validé")
     return FileResponse(AUDIO_DIR / name)
+
+
+@app.get("/admin", include_in_schema=False)
+@app.get("/admin/", include_in_schema=False)
+def admin_page():
+    """Lien direct vers le panneau admin : même page, l'onglet Admin s'ouvre automatiquement."""
+    return FileResponse(FRONTEND_DIR / "index.html")
 
 
 app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
