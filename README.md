@@ -1,127 +1,257 @@
-# 🦒 OkapiAI
+<div align="center">
 
-Plateforme communautaire pour **traduire, parler et apprendre** les langues congolaises :
-**lingala, swahili, kikongo, tshiluba** (avec le français comme langue pivot).
+<img src="frontend/assets/logo.jpg" alt="OkapiAI" width="230">
 
-## Fonctionnalités
+# OkapiAI
 
-| Onglet | Rôle |
-|---|---|
-| 💬 **Chat** | Mode **Converser** : on écrit en lingala, swahili, kikongo ou tshiluba, le système **répond dans la même langue** (avec la traduction française). Mode **Traduire** : traduction d'un mot ou d'une phrase. |
-| 🎙️ **Voix live** | Les deux mêmes modes, à la voix : on parle → transcription (si disponible) → réponse ou traduction. |
-| ➕ **Contribuer** | Ajouter une traduction ou un **dialogue** (message → réponse), avec la voix, et confirmer les propositions des autres. |
-| 📚 **Apprendre** | Cartes et quiz générés **uniquement** à partir des données validées, avec les voix. |
-| 🛡️ **Admin** | Valider ou rejeter les propositions, statistiques, export du dataset. |
+**Traduire, converser et apprendre les langues nationales de la RDC.**
 
-## Les deux datasets
+Lingala · Swahili · Kikongo · Tshiluba
 
-```
- Utilisateurs ──► dataset_collecte (brut, texte + voix)
-                       │  regroupement par similarité (≥ 85 %)
-                       ▼
-                  propositions ── moins de 10 personnes ─► statut "collecte"
-                       │  ≥ 10 personnes DIFFÉRENTES
-                       ▼
-                  "en_attente_admin" ── admin rejette ─► "rejete"
-                       │  admin approuve
-                       ▼
-                 dataset_entrainement (validé) ──► traduction, apprentissage, entraînement des modèles
-```
+<p>
+  <img src="https://img.shields.io/badge/Python-3.10%2B-1e7bff?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/FastAPI-backend-1e7bff?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI">
+  <img src="https://img.shields.io/badge/NLLB--200-traduction-f7d618?style=for-the-badge&logoColor=black" alt="NLLB-200">
+  <img src="https://img.shields.io/badge/Claude-conversation-ce1021?style=for-the-badge" alt="Claude">
+  <img src="https://img.shields.io/badge/statut-MVP-0a3fb8?style=for-the-badge" alt="Statut MVP">
+</p>
 
-- Une même personne ne compte qu'**une seule fois** par proposition (anti-spam).
-- Les variantes proches (« Mbote na yo », « mbote na yo! », « Mbote na yoo ») sont comptées ensemble.
-- L'admin peut corriger le texte final avant d'approuver. Il **ne peut pas** approuver avant d'atteindre le seuil.
-- Les voix brutes sont privées (visibles par leur auteur et l'admin). Elles deviennent publiques une fois validées.
+[Fonctionnalités](#-fonctionnalités) ·
+[Démarrage rapide](#-démarrage-rapide) ·
+[Validation des données](#-validation-des-données) ·
+[Configuration](#%EF%B8%8F-configuration) ·
+[API](#-api) ·
+[Entraînement](#-entraînement-des-modèles) ·
+[Contribuer](#-contribuer)
 
-Paramètres (variables d'environnement) : `OKAPI_MIN_SIMILAR` (10 par défaut), `OKAPI_SIMILARITY_THRESHOLD` (0.85).
+</div>
 
-## Converser en langue nationale
+---
 
-Le bot répond, dans l'ordre :
-1. avec un **dialogue validé** par la communauté (10 personnes, puis l'admin) ;
-2. sinon avec **l'IA (Claude)**, si elle est activée. Avec chaque message, elle reçoit les exemples validés les plus proches, et elle est invitée à reprendre leur vocabulaire ;
-3. sinon, il demande à l'utilisateur de lui **apprendre une réponse**.
+## 🦓 À propos
 
-Chaque réponse a un bouton **✏️ Corriger**. La correction devient une contribution « dialogue », soumise à la même règle des 10 personnes et de l'admin. Les réponses de l'IA améliorent ainsi le dataset au fil du temps.
+Les langues congolaises sont parlées par des dizaines de millions de personnes, mais les outils numériques qui les comprennent restent rares. **OkapiAI** est une plateforme communautaire qui construit, avec les locuteurs eux-mêmes, des **données de qualité** (texte et voix). Ces données servent ensuite à entraîner des modèles de traduction, de reconnaissance vocale et de conversation.
 
-Pour activer l'IA :
+Chaque phrase qui entre dans le dataset d'entraînement a été **proposée par au moins 10 personnes différentes**, puis **validée par un administrateur**.
 
-```bash
-pip install anthropic
-set ANTHROPIC_API_KEY=sk-ant-...      # Linux/Mac : export ANTHROPIC_API_KEY=...
-```
+<div align="center">
+  <img src="docs/apercu.png" alt="Aperçu de l'interface OkapiAI" width="860">
+</div>
 
-Les options sont `OKAPI_LLM_MODEL` (par défaut `claude-opus-5-5`), `OKAPI_LLM_EFFORT` (par défaut `low`) et `OKAPI_LLM_ENABLED=0` pour la couper.
-⚠️ Chaque message envoyé à l'IA est facturé sur votre compte Anthropic. Les messages des utilisateurs sont envoyés à l'API d'Anthropic : prévenez-les.
-La qualité est bonne en swahili, correcte en lingala, et plus faible en kikongo et en tshiluba. Ce sont justement les corrections de la communauté qui comblent ces écarts.
+## ✨ Fonctionnalités
 
-## Démarrage
+| | Module | Description |
+|---|---|---|
+| 💬 | **Chat** | **Converser** : l'utilisateur écrit en langue nationale, le système **répond dans la même langue** (traduction française disponible). **Traduire** : un mot ou une phrase, dans les deux sens. |
+| 🎙️ | **Voix live** | Les mêmes modes à la voix : on parle, la voix est transcrite, puis le système répond ou traduit. On peut enregistrer sa voix dans le dataset. |
+| ➕ | **Contribuer** | Proposer une **traduction** ou un **dialogue** (message → réponse), avec la voix, et confirmer les propositions des autres. |
+| 📚 | **Apprendre** | Cartes et quiz générés **uniquement** à partir des données validées, avec la prononciation enregistrée. |
+| 🛡️ | **Administration** | Valider ou rejeter les propositions, corriger le texte final, écouter les voix, suivre les statistiques, exporter le dataset. |
+
+## 🚀 Démarrage rapide
+
+**Prérequis :** Python 3.10 ou plus récent.
 
 ```bash
-cd backend
+git clone https://github.com/PascalMTK/OkapiAI.git
+cd OkapiAI/backend
+
 python -m venv .venv
-.venv\Scripts\activate          # Windows   (Linux/Mac : source .venv/bin/activate)
+.venv\Scripts\activate            # Windows
+# source .venv/bin/activate       # Linux / macOS
+
 pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-Ouvrir http://localhost:8000. Le compte admin par défaut est `admin` / `admin123`.
-**Changez-le** avec `OKAPI_ADMIN_USERNAME`, `OKAPI_ADMIN_PASSWORD` et `OKAPI_SECRET_KEY` avant toute mise en ligne.
+Ouvrez **http://localhost:8000**. La documentation interactive de l'API est disponible sur **http://localhost:8000/docs**.
 
-Documentation de l'API : http://localhost:8000/docs
+> [!IMPORTANT]
+> Un compte administrateur `admin` / `admin123` est créé au premier démarrage.
+> Changez `OKAPI_ADMIN_PASSWORD` et `OKAPI_SECRET_KEY` avant toute mise en ligne.
 
-### Reconnaissance vocale (optionnelle)
+### Modules optionnels
 
 ```bash
-pip install faster-whisper
+pip install anthropic          # conversation IA en langue nationale
+pip install faster-whisper     # reconnaissance vocale (swahili, lingala, français)
 ```
 
-Whisper reconnaît le **swahili, le lingala et le français**. Pour le **kikongo et le tshiluba**,
-l'utilisateur tape ce qu'il a dit. Ces enregistrements servent à entraîner plus tard un modèle vocal dédié.
+## 🧭 Validation des données
 
-## Entraîner le modèle de traduction
+OkapiAI sépare strictement **deux datasets** :
 
-Le système utilise **NLLB-200** (Meta), qui connaît déjà les 4 langues. On l'affine avec le dataset validé :
+| Dataset | Table | Contenu |
+|---|---|---|
+| **Collecte** | `dataset_collecte` | Tout ce que les utilisateurs envoient, texte et voix, sans filtre. |
+| **Entraînement** | `dataset_entrainement` | Uniquement les données qui ont atteint le seuil communautaire **et** ont été approuvées par un admin. |
+
+```mermaid
+flowchart LR
+    U([Utilisateurs]) -->|texte + voix| C[(Dataset de collecte)]
+    C -->|regroupement par similarité ≥ 85 %| P{Proposition}
+    P -->|moins de 10 personnes| W[En collecte]
+    W -.->|d'autres confirment| P
+    P -->|10 personnes différentes ou plus| A{Admin}
+    A -->|rejette| R[Rejetée]
+    A -->|approuve| T[(Dataset d'entraînement)]
+    T --> M1[Traduction]
+    T --> M2[Conversation]
+    T --> M3[Apprentissage]
+    T --> M4[Entraînement des modèles]
+```
+
+- **Anti-spam :** une même personne ne compte qu'une seule fois par proposition.
+- **Variantes :** « Mbote na yo », « mbote na yo! » et « Mbote na yoo » sont comptées ensemble.
+- **Pas de raccourci :** l'admin peut corriger le texte final, mais **ne peut pas** approuver avant le seuil.
+- **Voix privées :** les enregistrements bruts ne sont visibles que par leur auteur et l'admin. Ils deviennent publics une fois validés.
+
+## 🗣️ Converser en langue nationale
+
+```mermaid
+flowchart LR
+    Q[Message en lingala, swahili, kikongo ou tshiluba] --> D{Dialogue validé ?}
+    D -->|oui| R1[Réponse de la communauté]
+    D -->|non| I{IA activée ?}
+    I -->|oui| R2["Réponse IA ancrée sur le dataset"]
+    I -->|non| R3[« Apprenez-moi une réponse »]
+    R1 & R2 & R3 --> F[✏️ Corriger → nouvelle contribution]
+```
+
+Le bot répond toujours **dans la langue de l'utilisateur**. Avec chaque message, l'IA reçoit les exemples validés les plus proches et est invitée à reprendre leur vocabulaire. Chaque réponse peut être **corrigée** : la correction suit le même circuit de validation, et le système s'améliore avec l'usage.
+
+> [!NOTE]
+> La qualité de l'IA est bonne en swahili, correcte en lingala, et plus faible en kikongo et en tshiluba. Les réponses générées sont signalées comme telles dans l'interface.
+
+## ⚙️ Configuration
+
+Toutes les options se règlent par variables d'environnement.
+
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `OKAPI_MIN_SIMILAR` | `10` | Nombre de contributeurs différents requis avant la revue admin |
+| `OKAPI_SIMILARITY_THRESHOLD` | `0.85` | Seuil de similarité pour regrouper deux contributions |
+| `OKAPI_LOOKUP_THRESHOLD` | `0.80` | Seuil pour qu'une recherche dans le dataset soit acceptée |
+| `OKAPI_DATABASE_URL` | SQLite local | Ex. `postgresql+psycopg://user:pass@host/okapi` |
+| `OKAPI_SECRET_KEY` | *(à changer)* | Clé de signature des sessions |
+| `OKAPI_ADMIN_USERNAME` / `OKAPI_ADMIN_PASSWORD` | `admin` / `admin123` | Compte admin initial |
+| `ANTHROPIC_API_KEY` | — | Active la conversation IA |
+| `OKAPI_LLM_MODEL` | `claude-opus-5-5` | Modèle utilisé pour la conversation |
+| `OKAPI_LLM_EFFORT` | `low` | Profondeur de réflexion (`low` → `max`) |
+| `OKAPI_LLM_ENABLED` | — | `0` pour couper l'IA |
+| `OKAPI_WHISPER_MODEL` | `small` | Taille du modèle de reconnaissance vocale |
+
+> [!WARNING]
+> Lorsque l'IA est activée, les messages des utilisateurs sont envoyés à l'API d'Anthropic, et chaque requête est facturée sur votre compte. Informez-en vos utilisateurs.
+
+## 🔌 API
+
+<details>
+<summary><b>Voir les principaux points d'accès</b></summary>
+
+| Méthode | Route | Description |
+|---|---|---|
+| `POST` | `/api/auth/register` · `/api/auth/login` | Créer un compte, se connecter |
+| `POST` | `/api/converse` | Converser en langue nationale |
+| `POST` | `/api/voice/converse` | Converser à la voix |
+| `POST` | `/api/translate` · `/api/chat` | Traduire (réponse brute ou formulée) |
+| `POST` | `/api/voice/chat` | Traduire à la voix |
+| `POST` | `/api/contributions/text` · `/api/contributions/voice` | Proposer une traduction ou un dialogue |
+| `GET` | `/api/contributions/proposals` | Propositions à confirmer |
+| `POST` | `/api/contributions/proposals/{id}/confirm` | Confirmer une proposition |
+| `GET` | `/api/learn/cards` · `/api/learn/quiz` | Cartes et quiz |
+| `GET` | `/api/admin/propositions` | Propositions en attente *(admin)* |
+| `POST` | `/api/admin/propositions/{id}/approve` · `/reject` | Décision admin *(admin)* |
+| `GET` | `/api/admin/export/entrainement.jsonl` | Export du dataset d'entraînement *(admin)* |
+
+La documentation complète et testable est générée automatiquement sur `/docs`.
+
+</details>
+
+## 🧠 Entraînement des modèles
+
+OkapiAI s'appuie sur **NLLB-200** (Meta), qui connaît déjà les quatre langues, et l'affine avec le dataset validé par la communauté.
 
 ```bash
 cd backend
-pip install -r training/requirements.txt
-python -m training.export_dataset --out training/export     # traduction.jsonl + dialogue.jsonl + voix.jsonl
+pip install -r training/requirements.txt            # GPU recommandé
+
+python -m training.export_dataset --out training/export
 python -m training.train_nllb --data training/export/traduction.jsonl --epochs 5
 ```
 
-Le modèle est enregistré dans `backend/models/okapi-nllb`. L'API l'utilise automatiquement au redémarrage.
-Ordre de traduction : **dataset validé → modèle entraîné → mot à mot**.
+| Fichier exporté | Usage |
+|---|---|
+| `traduction.jsonl` | Paires de traduction dans les deux sens → fine-tuning NLLB-200 |
+| `dialogue.jsonl` | Paires message → réponse → chatbot conversationnel |
+| `voix.jsonl` | Audio + transcription + langue → reconnaissance vocale (Whisper, MMS) |
 
-`voix.jsonl` (audio + texte + langue) est prêt pour l'entraînement d'un modèle de reconnaissance vocale
-(ex. fine-tuning Whisper ou MMS).
+Le modèle est enregistré dans `backend/models/okapi-nllb` et utilisé automatiquement au redémarrage. L'ordre de traduction est le suivant : **dataset validé → modèle entraîné → mot à mot**.
 
-## Tests
+## 🏗️ Architecture
+
+```
+OkapiAI/
+├── backend/
+│   ├── app/
+│   │   ├── main.py              # Application FastAPI, migrations, audios
+│   │   ├── models.py            # users · propositions · dataset_collecte · dataset_entrainement
+│   │   ├── routers/             # auth · chat & voix · contributions · learn · admin
+│   │   └── services/
+│   │       ├── dataset.py       # Règle des 10 contributeurs + validation admin
+│   │       ├── conversation.py  # Dialogue validé → IA → « apprenez-moi »
+│   │       ├── llm.py           # Conversation IA (Claude), optionnelle
+│   │       ├── translator.py    # Dataset → modèle NLLB → mot à mot
+│   │       └── speech.py        # Reconnaissance vocale (faster-whisper), optionnelle
+│   ├── training/                # Export du dataset et fine-tuning
+│   └── tests/
+├── frontend/                    # Interface web (HTML · CSS · JavaScript)
+└── docs/
+```
+
+**Stack :** FastAPI · SQLAlchemy 2 · SQLite / PostgreSQL · JavaScript sans framework · Hugging Face Transformers · Anthropic SDK · faster-whisper
+
+## 🧪 Tests
 
 ```bash
 cd backend
 python tests/test_flow.py
 ```
 
-## Structure
+Les tests couvrent le circuit complet : seuil des 10 contributeurs, anti-spam, validation admin, traduction dans les deux sens, contributions vocales, droits d'accès aux audios et conversation. L'IA y est simulée, donc aucun appel réseau n'est fait.
 
-```
-backend/
-  app/
-    main.py            # application FastAPI + service des audios
-    models.py          # tables : users, propositions, dataset_collecte, dataset_entrainement
-    services/dataset.py    # règle des 10 similaires + validation admin
-    services/translator.py # dataset -> modèle -> mot à mot
-    services/speech.py     # reconnaissance vocale (faster-whisper)
-    routers/           # auth, chat/voix, contributions, learn, admin
-  training/            # export du dataset + fine-tuning NLLB
-  tests/
-frontend/              # interface web (HTML/CSS/JS)
-```
+## 🗺️ Feuille de route
 
-## Prochaines étapes conseillées
+- [x] Traduction communautaire validée (10 contributeurs + admin)
+- [x] Collecte vocale et apprentissage
+- [x] Conversation en langue nationale
+- [ ] Synthèse vocale entraînée sur les voix validées, pour que le bot parle lingala ou tshiluba
+- [ ] Reconnaissance vocale dédiée au kikongo et au tshiluba
+- [ ] Conversation vocale en streaming (WebSocket)
+- [ ] Limitation de débit et nettoyage automatique des audios non utilisés
+- [ ] Application mobile
 
-- PostgreSQL en production (`OKAPI_DATABASE_URL=postgresql+psycopg://...`).
-- Limite de requêtes et nettoyage des audios de « Voix live » jamais ajoutés au dataset.
-- Synthèse vocale (TTS) entraînée sur les voix validées, pour faire parler le chatbot en lingala ou en tshiluba.
-- Chat vocal en streaming (WebSocket) au lieu du mode « appuyer pour parler ».
+## 🤝 Contribuer
+
+OkapiAI a d'abord besoin de **locuteurs natifs**. La meilleure façon de contribuer est d'utiliser la plateforme : proposer des phrases, enregistrer sa voix et confirmer les propositions des autres.
+
+Pour contribuer au code :
+
+1. Créez une branche : `git checkout -b ma-fonctionnalite`
+2. Vérifiez que les tests passent : `python tests/test_flow.py`
+3. Ouvrez une *pull request* qui décrit le changement
+
+> [!CAUTION]
+> Ne commitez jamais le dataset (`backend/data/`, exports `*.jsonl`) ni les modèles entraînés : ils sont exclus par le `.gitignore`.
+
+## 📄 Licence
+
+La licence du projet n'a pas encore été choisie. Tant qu'aucune licence n'est publiée, tous les droits sont réservés aux auteurs.
+
+---
+
+<div align="center">
+
+**Fait avec ❤️ pour les langues de la République démocratique du Congo** 🇨🇩
+
+</div>
