@@ -1,0 +1,6 @@
+# Dépendances pour l'entraînement du modèle de traduction (GPU recommandé)
+torch>=2.3
+transformers>=4.44
+datasets>=2.20
+sentencepiece>=0.2
+accelerate>=0.33

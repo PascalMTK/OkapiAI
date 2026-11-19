@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OkapiAI</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="brand">🦒 <b>OkapiAI</b> <span class="muted">Lingala · Swahili · Kikongo · Tshiluba</span></div>
+  <div id="account"></div>
+</header>
+
+<nav>
+  <button data-tab="chat" class="active">💬 Chat</button>
+  <button data-tab="voice">🎙️ Voix live</button>
+  <button data-tab="contribute">➕ Contribuer</button>
+  <button data-tab="learn">📚 Apprendre</button>
+  <button data-tab="admin" id="admin-tab" hidden>🛡️ Admin</button>
+</nav>
+
+<main>
+  <!-- CHAT / TRADUCTION -->
+  <section id="tab-chat" class="tab active">
+    <div class="langbar">
+      <select id="chat-src" class="lang"></select>
+      <button class="icon" id="chat-swap" title="Inverser">⇄</button>
+      <select id="chat-tgt" class="lang"></select>
+    </div>
+    <div id="chat-log" class="log"></div>
+    <form id="chat-form" class="composer">
+      <input id="chat-input" placeholder="Tapez un mot ou une phrase…" autocomplete="off" required>
+      <button type="submit">Envoyer</button>
+    </form>
+  </section>
+
+  <!-- VOIX LIVE -->
+  <section id="tab-voice" class="tab">
+    <div class="langbar">
+      <label>Je parle <select id="voice-src" class="lang"></select></label>
+      <label>Traduire en <select id="voice-tgt" class="lang"></select></label>
+    </div>
+    <div class="center">
+      <button id="rec-btn" class="rec">🎙️<br>Appuyer pour parler</button>
+      <p id="voice-hint" class="muted"></p>
+    </div>
+    <div id="voice-log" class="log"></div>
+  </section>
+
+  <!-- CONTRIBUER -->
+  <section id="tab-contribute" class="tab">
+    <div class="card">
+      <h2>Ajouter une phrase au dataset</h2>
+      <p class="muted">Une phrase entre dans le dataset d'entraînement quand au moins
+        <b class="min-similar">10</b> personnes différentes proposent la même traduction,
+        puis qu'un administrateur la valide.</p>
+      <form id="contrib-form" class="grid">
+        <label>Langue <select name="source_lang" class="lang"></select></label>
+        <label>Phrase <input name="source_text" required></label>
+        <label>Traduite en <select name="target_lang" class="lang"></select></label>
+        <label>Traduction <input name="target_text" required></label>
+        <div class="recorder" data-recorder="contrib">
+          <button type="button" class="rec-small">🎙️ Enregistrer ma voix (optionnel)</button>
+          <audio controls hidden></audio>
+        </div>
+        <button type="submit">Envoyer</button>
+      </form>
+      <p id="contrib-msg" class="msg"></p>
+    </div>
+
+    <div class="card">
+      <h2>Confirmer les propositions des autres</h2>
+      <p class="muted">Vous connaissez ces traductions ? Confirmez-les pour les aider à atteindre le seuil.</p>
+      <label>Filtrer <select id="prop-filter"><option value="">Toutes les langues</option></select></label>
+      <div id="proposals"></div>
+    </div>
+
+    <div class="card">
+      <h2>Mes contributions</h2>
+      <div id="mine"></div>
+    </div>
+  </section>
+
+  <!-- APPRENDRE -->
+  <section id="tab-learn" class="tab">
+    <div class="langbar">
+      <label>J'apprends <select id="learn-lang"></select></label>
+      <button id="learn-cards-btn">Cartes</button>
+      <button id="learn-quiz-btn">Quiz</button>
+    </div>
+    <div id="learn-area" class="card"></div>
+  </section>
+
+  <!-- ADMIN -->
+  <section id="tab-admin" class="tab">
+    <div id="admin-stats" class="stats"></div>
+    <div class="langbar">
+      <label>Afficher <select id="admin-status">
+        <option value="en_attente_admin">En attente de validation</option>
+        <option value="collecte">En collecte (&lt; seuil)</option>
+        <option value="approuve">Approuvées</option>
+        <option value="rejete">Rejetées</option>
+      </select></label>
+      <button id="admin-export">⬇️ Exporter le dataset d'entraînement</button>
+    </div>
+    <div id="admin-list"></div>
+  </section>
+</main>
+
+<dialog id="login-dialog">
+  <form id="login-form" method="dialog">
+    <h2>Connexion</h2>
+    <input name="username" placeholder="Nom d'utilisateur" required minlength="3">
+    <input name="password" type="password" placeholder="Mot de passe" required minlength="6">
+    <p id="login-msg" class="msg"></p>
+    <div class="row">
+      <button value="login">Se connecter</button>
+      <button value="register" class="secondary">Créer un compte</button>
+      <button value="cancel" class="secondary" formnovalidate>Annuler</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="app.js"></script>
+</body>
+</html>

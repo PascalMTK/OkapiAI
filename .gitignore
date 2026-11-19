@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+backend/data/
+backend/models/
+*.db
+.env
+backend/training/export/
+*.jsonl
