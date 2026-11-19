@@ -961,8 +961,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   api("/api/features").then((f) => {
     state.features = f;
-    $("#ai-badge-text").textContent = f.ai_conversation ? "IA active" : "Réponses du dataset";
-    $("#ai-badge").title = f.ai_conversation ? "Conversation libre avec l'IA, ancrée sur le dataset validé"
+    const via = (f.ai_providers || []).join(" + ");
+    $("#ai-badge-text").textContent = f.ai_conversation ? `IA active${via ? ` (${via})` : ""}` : "Réponses du dataset";
+    $("#ai-badge").title = f.ai_conversation ? `Conversation libre avec l'IA (${via}), ancrée sur le dataset validé`
       : "L'IA n'est pas activée sur le serveur : le bot répond avec les dialogues validés par la communauté";
   }).catch(() => {});
 

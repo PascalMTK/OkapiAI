@@ -9,6 +9,7 @@ from pathlib import Path
 
 os.environ["OKAPI_DATA_DIR"] = tempfile.mkdtemp(prefix="okapi_test_")
 os.environ["OKAPI_LLM_ENABLED"] = "0"  # jamais d'appel réseau pendant les tests
+os.environ["OKAPI_ENV_FILE"] = os.path.join(os.environ["OKAPI_DATA_DIR"], "aucun.env")  # pas les vraies clés
 os.environ["OKAPI_MODEL_DIR"] = os.path.join(os.environ["OKAPI_DATA_DIR"], "no-model")
 os.environ["OKAPI_VOICE_WARMUP"] = "0"  # pas de chargement des modèles vocaux pendant les tests
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -268,7 +269,73 @@ def test_voice_live_conversation():
         (rec.detect_and_transcribe, rec.auto_langs, rec.transcribe, rec.supports, syn.supports, syn.synthesize) = saved
 
 
+def test_free_ai_relay():
+    """Gemini atteint sa limite gratuite (429) -> OkapiAI passe à Groq ; puis Gemini est mis de côté."""
+    import json as _json
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    from app.services import llm
+
+    calls = []
+
+    class Fake(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def do_POST(self):
+            body = _json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            service = self.path.split("/")[1]
+            calls.append((service, self.headers["Authorization"], body["model"]))
+            if service == "gemini":
+                self.send_response(429)
+                self.end_headers()
+                self.wfile.write(b'{"error": "quota"}')
+                return
+            content = 'Voici : {"reply": "Nazali malamu, bongo yo?", "reply_fr": "Je vais bien, et toi ?"}'
+            payload = _json.dumps({"choices": [{"message": {"content": content}}]}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(payload)
+
+    server = HTTPServer(("127.0.0.1", 0), Fake)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    port = server.server_address[1]
+    env = {"GEMINI_API_KEY": "g-key", "GROQ_API_KEY": "q-key",
+           "OKAPI_GEMINI_BASE_URL": f"http://127.0.0.1:{port}/gemini",
+           "OKAPI_GROQ_BASE_URL": f"http://127.0.0.1:{port}/groq",
+           "OKAPI_LLM_PROVIDERS": "gemini,groq", "OKAPI_LLM_ENABLED": "1"}
+    old = {k: os.environ.get(k) for k in env}
+    os.environ.update(env)
+    try:
+        chain = llm.LLMChain()
+        assert chain.names() == ["Gemini", "Groq"]
+        r = chain.reply("ln", "Ozali malamu?", [], [])
+        assert r == {"reply": "Nazali malamu, bongo yo?", "reply_fr": "Je vais bien, et toi ?"}
+        assert chain.last_provider == "Groq"
+        assert [c[0] for c in calls] == ["gemini", "groq"]
+        assert calls[0][1] == "Bearer g-key" and calls[1][2] == "openai/gpt-oss-120b"
+        # Gemini limité : il est mis de côté, le message suivant va directement à Groq
+        chain.reply("ln", "Sango nini?", [], [])
+        assert [c[0] for c in calls] == ["gemini", "groq", "groq"]
+        # aucune clé -> aucune IA
+        for k in ("GEMINI_API_KEY", "GROQ_API_KEY"):
+            os.environ.pop(k)
+        assert llm.LLMChain().enabled() is False
+    finally:
+        server.shutdown()
+        for k, v in old.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+    assert llm.parse_reply("Mbote!") == {"reply": "Mbote!", "reply_fr": None}
+    assert llm.parse_reply('{"reply": ') is None
+
+
 if __name__ == "__main__":
+    test_free_ai_relay()
     test_full_flow()
     test_voice_contribution_and_audio_access()
     test_conversation_dialogue_and_ai()

@@ -77,8 +77,8 @@ async def lifespan(_: FastAPI):
     Base.metadata.create_all(engine)
     _migrate()
     _bootstrap_admin()
-    log.info("Conversation IA : %s", "activée" if claude_chat.enabled() else
-             "désactivée (installez 'anthropic' et définissez ANTHROPIC_API_KEY)")
+    log.info("Conversation IA : %s", f"activée ({' → '.join(claude_chat.names())})" if claude_chat.enabled() else
+             "désactivée (ajoutez GEMINI_API_KEY, GROQ_API_KEY ou OPENROUTER_API_KEY dans backend/.env)")
     if os.getenv("OKAPI_VOICE_WARMUP", "1") == "1":
         # Charge la reconnaissance vocale et les voix sans bloquer le démarrage du serveur
         threading.Thread(target=lambda: (recognizer.warmup(), synthesizer.warmup()), daemon=True).start()
@@ -104,7 +104,7 @@ async def revalidate_frontend(request, call_next):
 
 @app.get("/api/features")
 def features():
-    return {"ai_conversation": claude_chat.enabled(),
+    return {"ai_conversation": claude_chat.enabled(), "ai_providers": claude_chat.names(),
             "speech_recognition": [c for c in ("fr", "ln", "sw") if recognizer.supports(c)]}
 
 

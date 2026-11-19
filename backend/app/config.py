@@ -4,6 +4,21 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent          # backend/
 ROOT_DIR = BASE_DIR.parent                                  # racine du projet
+
+
+def _load_env_file(path: Path) -> None:
+    """Charge backend/.env (CLE=valeur par ligne) sans écraser les variables déjà définies."""
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8-sig").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
+_load_env_file(Path(os.getenv("OKAPI_ENV_FILE", BASE_DIR / ".env")))
 FRONTEND_DIR = ROOT_DIR / "frontend"
 # Corpus lingala (dictionnaires Wiktionnaire / Wikipédia) utilisé pour expliquer les mots
 DATASET_DIR = Path(os.getenv("OKAPI_DATASET_DIR", ROOT_DIR / "dataset"))

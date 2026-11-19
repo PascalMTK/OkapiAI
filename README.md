@@ -77,9 +77,14 @@ uvicorn app.main:app --reload
 ### Modules optionnels
 
 ```bash
-pip install anthropic          # conversation IA en langue nationale
 pip install torch transformers huggingface_hub imageio-ffmpeg   # voix live (MMS)
 ```
+
+#### Conversation IA gratuite : Gemini + Groq
+
+Copiez `backend/.env.example` en `backend/.env` et collez vos clés gratuites :
+[Gemini](https://aistudio.google.com/apikey) (`GEMINI_API_KEY`) et [Groq](https://console.groq.com/keys) (`GROQ_API_KEY`).
+OkapiAI essaie **Gemini, puis Groq** : si l'un atteint sa limite gratuite ou ne répond pas, l'autre prend le relais automatiquement. Aucun paquet à installer. Les IA restent ancrées sur le dataset validé et le dictionnaire, mais peuvent faire des erreurs en langue nationale : les utilisateurs peuvent corriger chaque réponse.
 
 #### Voix live : parler avec OkapiAI
 
