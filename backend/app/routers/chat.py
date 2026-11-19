@@ -1,11 +1,14 @@
-"""Chatbot de traduction (texte) et chat vocal."""
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+"""Chatbot : traduction, conversation en langue nationale (texte et voix)."""
+import json
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from pydantic import TypeAdapter, ValidationError
 from sqlalchemy.orm import Session
 
-from ..config import AUDIO_DIR, LANGUAGES
+from ..config import AUDIO_DIR, CONGOLESE, LANGUAGES
 from ..database import get_db
-from ..schemas import TranslateIn, check_langs
-from ..services import translator
+from ..schemas import ChatTurn, ConverseIn, TranslateIn, check_langs
+from ..services import conversation, translator
 from ..services.audio import save_audio
 from ..services.speech import recognizer
 
@@ -61,4 +64,51 @@ async def voice_chat(
            "asr_available": recognizer.supports(source_lang), "translation": None}
     if transcript:
         out["translation"] = translator.translate(db, transcript, source_lang, target_lang)
+    return out
+
+
+def _check_conv_lang(lang: str) -> None:
+    if lang not in CONGOLESE:
+        raise HTTPException(400, "La conversation se fait en lingala, swahili, kikongo ou tshiluba")
+
+
+def _with_hint(res: dict) -> dict:
+    if res["reply"] is None:
+        res["hint"] = ("Je ne sais pas encore répondre à ce message dans cette langue. "
+                       "Apprenez-moi : écrivez la réponse qu'une personne donnerait !")
+    elif res["method"] == "ia":
+        res["hint"] = "Réponse générée par l'IA : elle peut contenir des erreurs. Corrigez-la si besoin !"
+    return res
+
+
+@router.post("/converse")
+def converse(body: ConverseIn, db: Session = Depends(get_db)):
+    """Converser en langue nationale : le système répond dans la même langue."""
+    _check_conv_lang(body.lang)
+    history = [t.model_dump() for t in body.history]
+    return _with_hint(conversation.converse(db, body.lang, body.message, history))
+
+
+_history_adapter = TypeAdapter(list[ChatTurn])
+
+
+@router.post("/voice/converse")
+async def voice_converse(
+    audio: UploadFile = File(...),
+    lang: str = Form(...),
+    history: str = Form("[]"),
+    db: Session = Depends(get_db),
+):
+    """Conversation vocale : transcription (si disponible) puis réponse dans la même langue."""
+    _check_conv_lang(lang)
+    try:
+        turns = [t.model_dump() for t in _history_adapter.validate_python(json.loads(history))][-20:]
+    except (json.JSONDecodeError, ValidationError):
+        raise HTTPException(400, "Historique invalide")
+    name = await save_audio(audio)
+    transcript = recognizer.transcribe(AUDIO_DIR / name, lang)
+    out = {"audio_file": name, "transcript": transcript,
+           "asr_available": recognizer.supports(lang), "answer": None}
+    if transcript:
+        out["answer"] = _with_hint(conversation.converse(db, lang, transcript, turns))
     return out

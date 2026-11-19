@@ -23,23 +23,32 @@
 <main>
   <!-- CHAT / TRADUCTION -->
   <section id="tab-chat" class="tab active">
+    <div class="modes" data-modes="chat">
+      <button type="button" data-mode="converse" class="active">🗣️ Converser</button>
+      <button type="button" data-mode="translate">🔁 Traduire</button>
+    </div>
     <div class="langbar">
       <select id="chat-src" class="lang"></select>
-      <button class="icon" id="chat-swap" title="Inverser">⇄</button>
-      <select id="chat-tgt" class="lang"></select>
+      <button class="icon translate-only" id="chat-swap" title="Inverser">⇄</button>
+      <select id="chat-tgt" class="lang translate-only"></select>
+      <span id="ai-badge" class="tag converse-only"></span>
     </div>
     <div id="chat-log" class="log"></div>
     <form id="chat-form" class="composer">
-      <input id="chat-input" placeholder="Tapez un mot ou une phrase…" autocomplete="off" required>
+      <input id="chat-input" placeholder="Écrivez dans la langue choisie…" autocomplete="off" required>
       <button type="submit">Envoyer</button>
     </form>
   </section>
 
   <!-- VOIX LIVE -->
   <section id="tab-voice" class="tab">
+    <div class="modes" data-modes="voice">
+      <button type="button" data-mode="converse" class="active">🗣️ Converser</button>
+      <button type="button" data-mode="translate">🔁 Traduire</button>
+    </div>
     <div class="langbar">
       <label>Je parle <select id="voice-src" class="lang"></select></label>
-      <label>Traduire en <select id="voice-tgt" class="lang"></select></label>
+      <label class="translate-only">Traduire en <select id="voice-tgt" class="lang"></select></label>
     </div>
     <div class="center">
       <button id="rec-btn" class="rec">🎙️<br>Appuyer pour parler</button>
@@ -51,15 +60,21 @@
   <!-- CONTRIBUER -->
   <section id="tab-contribute" class="tab">
     <div class="card">
-      <h2>Ajouter une phrase au dataset</h2>
-      <p class="muted">Une phrase entre dans le dataset d'entraînement quand au moins
-        <b class="min-similar">10</b> personnes différentes proposent la même traduction,
+      <h2>Ajouter au dataset</h2>
+      <p class="muted">Une donnée entre dans le dataset d'entraînement quand au moins
+        <b class="min-similar">10</b> personnes différentes proposent la même chose,
         puis qu'un administrateur la valide.</p>
+      <div class="modes" data-modes="contrib">
+        <button type="button" data-mode="translate" class="active">🔁 Traduction</button>
+        <button type="button" data-mode="converse">🗣️ Dialogue (apprendre au bot à converser)</button>
+      </div>
       <form id="contrib-form" class="grid">
         <label>Langue <select name="source_lang" class="lang"></select></label>
-        <label>Phrase <input name="source_text" required></label>
-        <label>Traduite en <select name="target_lang" class="lang"></select></label>
-        <label>Traduction <input name="target_text" required></label>
+        <label><span class="translate-only">Phrase</span><span class="converse-only">Message (ce qu'on dit au bot)</span>
+          <input name="source_text" required></label>
+        <label class="translate-only">Traduite en <select name="target_lang" class="lang"></select></label>
+        <label><span class="translate-only">Traduction</span><span class="converse-only">Réponse (ce que le bot devrait répondre)</span>
+          <input name="target_text" required></label>
         <div class="recorder" data-recorder="contrib">
           <button type="button" class="rec-small">🎙️ Enregistrer ma voix (optionnel)</button>
           <audio controls hidden></audio>

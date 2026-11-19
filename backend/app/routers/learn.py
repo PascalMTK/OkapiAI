@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from ..config import LANGUAGES
 from ..database import get_db
-from ..models import TrainingEntry
+from ..models import TRADUCTION, TrainingEntry
 from ..services.translator import audio_url
 
 router = APIRouter(prefix="/api/learn", tags=["learn"])
@@ -26,7 +26,8 @@ def _pool(db: Session, lang: str, n: int) -> list[TrainingEntry]:
     if lang not in LANGUAGES:
         raise HTTPException(400, "Langue inconnue")
     q = (select(TrainingEntry)
-         .where(or_(TrainingEntry.source_lang == lang, TrainingEntry.target_lang == lang))
+         .where(TrainingEntry.kind == TRADUCTION,
+                or_(TrainingEntry.source_lang == lang, TrainingEntry.target_lang == lang))
          .order_by(func.random()).limit(n))
     return list(db.scalars(q))
 

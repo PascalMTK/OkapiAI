@@ -81,3 +81,15 @@ dialog form { display: flex; flex-direction: column; gap: 10px; }
 dialog::backdrop { background: rgba(0,0,0,.4); }
 .variants { font-size: .85rem; color: var(--muted); margin: 6px 0; }
 .admin-edit { display: grid; gap: 6px; margin: 8px 0; }
+
+.modes { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--border); border-radius: 10px;
+         margin-bottom: 12px; background: var(--panel); flex-wrap: wrap; }
+.modes button { background: transparent; color: var(--text); padding: 6px 12px; }
+.modes button.active { background: var(--accent); color: #fff; }
+[data-mode-scope="converse"] .translate-only, [data-mode-scope="translate"] .converse-only { display: none !important; }
+.bubble .fr { font-size: .85rem; opacity: .85; font-style: italic; margin-top: 4px; }
+.bubble .actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.bubble .actions button { padding: 3px 10px; font-size: .8rem; }
+.bubble .teach { display: flex; gap: 6px; margin-top: 6px; }
+.bubble .teach input { padding: 4px 8px; }
+.bubble .reply { font-size: 1.05rem; }

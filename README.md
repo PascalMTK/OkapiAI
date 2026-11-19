@@ -7,9 +7,9 @@ Plateforme communautaire pour **traduire, parler et apprendre** les langues cong
 
 | Onglet | Rôle |
 |---|---|
-| 💬 **Chat** | Chatbot de traduction (mot ou phrase), dans les deux sens. |
-| 🎙️ **Voix live** | On parle → transcription (si disponible) → traduction. Bouton « Ajouter au dataset » pour enregistrer sa voix. |
-| ➕ **Contribuer** | Ajouter une phrase et sa traduction (+ voix), confirmer les propositions des autres. |
+| 💬 **Chat** | Mode **Converser** : on écrit en lingala, swahili, kikongo ou tshiluba, le système **répond dans la même langue** (avec la traduction française). Mode **Traduire** : traduction d'un mot ou d'une phrase. |
+| 🎙️ **Voix live** | Les deux mêmes modes, à la voix : on parle → transcription (si disponible) → réponse ou traduction. |
+| ➕ **Contribuer** | Ajouter une traduction ou un **dialogue** (message → réponse), avec la voix, et confirmer les propositions des autres. |
 | 📚 **Apprendre** | Cartes et quiz générés **uniquement** à partir des données validées, avec les voix. |
 | 🛡️ **Admin** | Valider ou rejeter les propositions, statistiques, export du dataset. |
 
@@ -34,6 +34,26 @@ Plateforme communautaire pour **traduire, parler et apprendre** les langues cong
 - Les voix brutes sont privées (visibles par leur auteur et l'admin). Elles deviennent publiques une fois validées.
 
 Paramètres (variables d'environnement) : `OKAPI_MIN_SIMILAR` (10 par défaut), `OKAPI_SIMILARITY_THRESHOLD` (0.85).
+
+## Converser en langue nationale
+
+Le bot répond, dans l'ordre :
+1. avec un **dialogue validé** par la communauté (10 personnes, puis l'admin) ;
+2. sinon avec **l'IA (Claude)**, si elle est activée. Avec chaque message, elle reçoit les exemples validés les plus proches, et elle est invitée à reprendre leur vocabulaire ;
+3. sinon, il demande à l'utilisateur de lui **apprendre une réponse**.
+
+Chaque réponse a un bouton **✏️ Corriger**. La correction devient une contribution « dialogue », soumise à la même règle des 10 personnes et de l'admin. Les réponses de l'IA améliorent ainsi le dataset au fil du temps.
+
+Pour activer l'IA :
+
+```bash
+pip install anthropic
+set ANTHROPIC_API_KEY=sk-ant-...      # Linux/Mac : export ANTHROPIC_API_KEY=...
+```
+
+Les options sont `OKAPI_LLM_MODEL` (par défaut `claude-opus-5-5`), `OKAPI_LLM_EFFORT` (par défaut `low`) et `OKAPI_LLM_ENABLED=0` pour la couper.
+⚠️ Chaque message envoyé à l'IA est facturé sur votre compte Anthropic. Les messages des utilisateurs sont envoyés à l'API d'Anthropic : prévenez-les.
+La qualité est bonne en swahili, correcte en lingala, et plus faible en kikongo et en tshiluba. Ce sont justement les corrections de la communauté qui comblent ces écarts.
 
 ## Démarrage
 
@@ -66,7 +86,7 @@ Le système utilise **NLLB-200** (Meta), qui connaît déjà les 4 langues. On l
 ```bash
 cd backend
 pip install -r training/requirements.txt
-python -m training.export_dataset --out training/export     # traduction.jsonl + voix.jsonl
+python -m training.export_dataset --out training/export     # traduction.jsonl + dialogue.jsonl + voix.jsonl
 python -m training.train_nllb --data training/export/traduction.jsonl --epochs 5
 ```
 

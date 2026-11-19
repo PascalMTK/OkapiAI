@@ -16,14 +16,15 @@ from sqlalchemy import distinct, func, select
 from sqlalchemy.orm import Session
 
 from ..config import MIN_SIMILAR, SIMILARITY_THRESHOLD
-from ..models import (APPROUVE, COLLECTE, EN_ATTENTE, REJETE, Contribution,
-                      Proposition, TrainingEntry, User, utcnow)
+from ..models import (APPROUVE, COLLECTE, DIALOGUE, EN_ATTENTE, REJETE, TRADUCTION,
+                      Contribution, Proposition, TrainingEntry, User, utcnow)
 from ..similarity import normalize, pair_similarity
 
 
-def find_proposition(db: Session, source_lang: str, target_lang: str,
+def find_proposition(db: Session, kind: str, source_lang: str, target_lang: str,
                      src_norm: str, tgt_norm: str) -> Optional[Proposition]:
-    same_pair = (Proposition.source_lang == source_lang) & (Proposition.target_lang == target_lang)
+    same_pair = ((Proposition.kind == kind) & (Proposition.source_lang == source_lang)
+                 & (Proposition.target_lang == target_lang))
     exact = db.scalar(select(Proposition).where(
         same_pair, Proposition.source_norm == src_norm, Proposition.target_norm == tgt_norm))
     if exact:
@@ -47,16 +48,20 @@ def support_count(db: Session, proposition_id: int) -> int:
 
 def add_contribution(db: Session, user: User, *, source_lang: str, source_text: str,
                      target_lang: str, target_text: str,
-                     audio_path: Optional[str] = None) -> Contribution:
+                     audio_path: Optional[str] = None, kind: str = TRADUCTION) -> Contribution:
     src_norm, tgt_norm = normalize(source_text), normalize(target_text)
     if not src_norm or not tgt_norm:
         raise ValueError("La phrase et sa traduction sont obligatoires")
-    if source_lang == target_lang:
+    if kind not in (TRADUCTION, DIALOGUE):
+        raise ValueError("Type de contribution inconnu")
+    if kind == TRADUCTION and source_lang == target_lang:
         raise ValueError("Les deux langues doivent être différentes")
+    if kind == DIALOGUE and source_lang != target_lang:
+        raise ValueError("Un dialogue (message -> réponse) se fait dans une seule langue")
 
-    prop = find_proposition(db, source_lang, target_lang, src_norm, tgt_norm)
+    prop = find_proposition(db, kind, source_lang, target_lang, src_norm, tgt_norm)
     if prop is None:
-        prop = Proposition(source_lang=source_lang, target_lang=target_lang,
+        prop = Proposition(kind=kind, source_lang=source_lang, target_lang=target_lang,
                            source_norm=src_norm, target_norm=tgt_norm)
         db.add(prop)
         db.flush()
@@ -103,13 +108,16 @@ def approve(db: Session, prop: Proposition, admin: User, *,
     tgt = (target_text or tgt).strip()
     src_norm = normalize(src)
 
+    # traduction : la voix prononce la phrase ; dialogue : la voix prononce la réponse
+    spoken = (lambda c: c.target_text) if prop.kind == DIALOGUE else (lambda c: c.source_text)
+    spoken_ref = normalize(tgt) if prop.kind == DIALOGUE else src_norm
     with_audio = [c for c in prop.contributions if c.audio_path]
-    best_audio = next((c.audio_path for c in with_audio if normalize(c.source_text) == src_norm), None)
+    best_audio = next((c.audio_path for c in with_audio if normalize(spoken(c)) == spoken_ref), None)
     if best_audio is None and with_audio:
         best_audio = with_audio[0].audio_path
 
     entry = TrainingEntry(
-        proposition_id=prop.id,
+        proposition_id=prop.id, kind=prop.kind,
         source_lang=prop.source_lang, source_text=src, source_norm=src_norm,
         target_lang=prop.target_lang, target_text=tgt, target_norm=normalize(tgt),
         audio_path=best_audio, support_count=support_count(db, prop.id),

@@ -5,6 +5,7 @@ Usage (depuis backend/) :
 
 Produit :
     traduction.jsonl  -> paires {src_lang, tgt_lang, src, tgt} (dans les deux sens)
+    dialogue.jsonl    -> {lang, message, reponse} pour entraîner/ancrer le chatbot conversationnel
     voix.jsonl        -> {audio, lang, text} pour entraîner un modèle de reconnaissance vocale
                          (toutes les voix des propositions approuvées, pas seulement la principale)
 """
@@ -16,7 +17,7 @@ from sqlalchemy import select
 
 from app.config import AUDIO_DIR
 from app.database import SessionLocal
-from app.models import APPROUVE, Contribution, Proposition, TrainingEntry
+from app.models import APPROUVE, DIALOGUE, TRADUCTION, Contribution, Proposition, TrainingEntry
 from app.similarity import normalize
 
 
@@ -32,11 +33,21 @@ def main() -> None:
         n_pairs = 0
         with open(out / "traduction.jsonl", "w", encoding="utf-8") as f:
             for e in entries:
+                if e.kind != TRADUCTION:
+                    continue
                 for s_lang, s, t_lang, t in ((e.source_lang, e.source_text, e.target_lang, e.target_text),
                                              (e.target_lang, e.target_text, e.source_lang, e.source_text)):
                     f.write(json.dumps({"src_lang": s_lang, "tgt_lang": t_lang, "src": s, "tgt": t},
                                        ensure_ascii=False) + "\n")
                     n_pairs += 1
+
+        n_dialogues = 0
+        with open(out / "dialogue.jsonl", "w", encoding="utf-8") as f:
+            for e in entries:
+                if e.kind == DIALOGUE:
+                    f.write(json.dumps({"lang": e.source_lang, "message": e.source_text,
+                                        "reponse": e.target_text}, ensure_ascii=False) + "\n")
+                    n_dialogues += 1
 
         n_audio = 0
         approved = {e.proposition_id: e for e in entries}
@@ -46,12 +57,15 @@ def main() -> None:
             for c in rows:
                 entry = approved.get(c.proposition_id)
                 # on garde le texte prononcé par la personne s'il correspond à la version validée
-                text = c.source_text if normalize(c.source_text) == entry.source_norm else entry.source_text
+                if entry.kind == DIALOGUE:  # la voix prononce la réponse
+                    text = c.target_text if normalize(c.target_text) == entry.target_norm else entry.target_text
+                else:
+                    text = c.source_text if normalize(c.source_text) == entry.source_norm else entry.source_text
                 f.write(json.dumps({"audio": str((AUDIO_DIR / c.audio_path).resolve()),
                                     "lang": c.source_lang, "text": text}, ensure_ascii=False) + "\n")
                 n_audio += 1
 
-    print(f"{n_pairs} paires de traduction et {n_audio} enregistrements vocaux exportés dans {out}")
+    print(f"{n_pairs} paires de traduction, {n_dialogues} dialogues et {n_audio} enregistrements vocaux exportés dans {out}")
 
 
 if __name__ == "__main__":

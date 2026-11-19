@@ -146,6 +146,76 @@ function translationHtml(r) {
     ${r.audio_url ? `<audio controls src="${esc(r.audio_url)}"></audio>` : ""}`;
 }
 
+// ---------- Modes (Converser / Traduire) ----------
+const modes = {};
+const modeOf = (name) => modes[name];
+function setupModes() {
+  $$(".modes[data-modes]").forEach((group) => {
+    const name = group.dataset.modes;
+    const scope = group.closest(".card") || group.closest(".tab");
+    const apply = (mode) => {
+      modes[name] = mode;
+      scope.dataset.modeScope = mode;
+      $$("button", group).forEach((b) => b.classList.toggle("active", b.dataset.mode === mode));
+      group.dispatchEvent(new CustomEvent("modechange", { detail: mode }));
+    };
+    $$("button", group).forEach((b) => (b.onclick = () => apply(b.dataset.mode)));
+    apply($("button.active", group)?.dataset.mode || $("button", group).dataset.mode);
+  });
+}
+
+// Une conversation se fait dans une langue congolaise
+function ensureCongolese(select) { if (select.value === "fr") select.value = "ln"; }
+
+// ---------- Conversation ----------
+const convHistory = { chat: [], voice: [] };
+
+function renderAnswer(log, lang, userMsg, a, key) {
+  const label = { dataset: "✅ réponse validée par la communauté", ia: "🤖 réponse IA" }[a.method] || "";
+  let html = a.reply
+    ? `<div class="reply">${esc(a.reply)}</div>
+       ${a.reply_fr ? `<details class="fr"><summary>🇫🇷 En français</summary>${esc(a.reply_fr)}</details>` : ""}
+       ${a.audio_url ? `<audio controls src="${esc(a.audio_url)}"></audio>` : ""}
+       <div class="meta">${label}${a.method === "ia" && a.hint ? ` · ${esc(a.hint)}` : ""}</div>`
+    : `<div>🤔 ${esc(a.hint || "Je ne sais pas encore répondre.")}</div>`;
+  html += `<div class="actions"><button type="button" class="secondary b-teach">${a.reply ? "✏️ Corriger" : "🧑‍🏫 Apprendre une réponse"}</button></div>`;
+  const b = bubble(log, "bot", html);
+  $(".b-teach", b).onclick = () => showTeach(b, lang, userMsg, a.reply);
+  if (a.reply) {
+    convHistory[key].push({ role: "user", text: userMsg }, { role: "assistant", text: a.reply });
+    convHistory[key] = convHistory[key].slice(-20);
+    if (!a.audio_url) speak(a.reply, lang);
+  }
+}
+
+function showTeach(b, lang, msg, current) {
+  if ($(".teach", b)) return;
+  const form = document.createElement("form");
+  form.className = "teach";
+  form.innerHTML = `<input placeholder="La bonne réponse en ${esc(langName(lang))}" value="${esc(current || "")}" required>
+    <button>Envoyer</button>`;
+  b.appendChild(form);
+  $("input", form).focus();
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    if (!requireLogin()) return;
+    const reply = $("input", form).value.trim();
+    if (!reply) return;
+    try {
+      const r = await api("/api/contributions/text", { method: "POST",
+        json: { kind: "dialogue", source_lang: lang, source_text: msg, target_lang: lang, target_text: reply } });
+      form.outerHTML = `<div class="meta">✅ ${esc(r.message)}</div>`;
+    } catch (err) { alert(err.message); }
+  };
+}
+
+async function sendConverse(log, lang, text, key) {
+  try {
+    const a = await api("/api/converse", { method: "POST", json: { lang, message: text, history: convHistory[key] } });
+    renderAnswer(log, lang, text, a, key);
+  } catch (err) { bubble(log, "bot", `⚠️ ${esc(err.message)}`); }
+}
+
 // ---------- Chat ----------
 $("#chat-swap").onclick = () => { const a = $("#chat-src").value; $("#chat-src").value = $("#chat-tgt").value; $("#chat-tgt").value = a; };
 $("#chat-form").addEventListener("submit", async (e) => {
@@ -155,6 +225,7 @@ $("#chat-form").addEventListener("submit", async (e) => {
   const log = $("#chat-log");
   bubble(log, "me", esc(text));
   $("#chat-input").value = "";
+  if (modeOf("chat") === "converse") return sendConverse(log, $("#chat-src").value, text, "chat");
   try {
     const r = await api("/api/chat", { method: "POST",
       json: { text, source_lang: $("#chat-src").value, target_lang: $("#chat-tgt").value } });
@@ -162,7 +233,7 @@ $("#chat-form").addEventListener("submit", async (e) => {
     if (r.translation) speak(r.translation, r.target_lang);
   } catch (err) { bubble(log, "bot", `⚠️ ${esc(err.message)}`); }
 });
-bubble($("#chat-log"), "bot", "Mbote ! Jambo ! Tapez un mot ou une phrase, je le traduis à partir du dataset validé par la communauté.");
+bubble($("#chat-log"), "bot", "Mbote ! Jambo ! Choisissez une langue et parlez-moi : je vous réponds dans la même langue. Le mode « Traduire » traduit vos phrases.");
 
 // ---------- Voix live ----------
 const voiceRec = makeRecorder();
@@ -188,12 +259,34 @@ $("#rec-btn").onclick = async () => {
   const me = bubble(log, "me", `<audio controls src="${URL.createObjectURL(blob)}"></audio><div class="meta">Transcription…</div>`);
   const form = new FormData();
   form.append("audio", blob, `voix.${extFor(blob)}`);
+  if (modeOf("voice") === "converse") {
+    form.append("lang", src);
+    form.append("history", JSON.stringify(convHistory.voice));
+    try { renderVoiceConverse(me, await api("/api/voice/converse", { method: "POST", form }), src); }
+    catch (err) { $(".meta", me).textContent = `⚠️ ${err.message}`; }
+    return;
+  }
   form.append("source_lang", src); form.append("target_lang", tgt);
   try {
     const r = await api("/api/voice/chat", { method: "POST", form });
     renderVoiceTurn(me, r, src, tgt);
   } catch (err) { $(".meta", me).textContent = `⚠️ ${err.message}`; }
 };
+
+function renderVoiceConverse(me, r, lang) {
+  $(".meta", me).remove();
+  const box = document.createElement("form");
+  box.innerHTML = `<input class="vt-src" placeholder="Ce que vous avez dit (${esc(langName(lang))})" value="${esc(r.transcript || "")}">
+    <div class="row" style="margin-top:6px"><button type="submit" class="secondary">${r.answer ? "Renvoyer corrigé" : "Envoyer"}</button></div>`;
+  me.appendChild(box);
+  if (r.answer) renderAnswer($("#voice-log"), lang, r.transcript, r.answer, "voice");
+  else $(".vt-src", box).focus();
+  box.onsubmit = (e) => {
+    e.preventDefault();
+    const text = $(".vt-src", box).value.trim();
+    if (text) sendConverse($("#voice-log"), lang, text, "voice");
+  };
+}
 
 function renderVoiceTurn(me, r, src, tgt) {
   $(".meta", me).remove();
@@ -256,6 +349,10 @@ $("#contrib-form").addEventListener("submit", async (e) => {
   if (!requireLogin()) return;
   const f = new FormData(e.target), msg = $("#contrib-msg");
   const recBox = $("[data-recorder=contrib]");
+  if (modeOf("contrib") === "converse") {
+    f.set("kind", "dialogue");
+    f.set("target_lang", f.get("source_lang"));
+  } else f.set("kind", "traduction");
   try {
     let res;
     if (recBox.blob) {
@@ -278,8 +375,10 @@ async function loadProposals() {
   const list = await api(`/api/contributions/proposals${lang ? `?lang=${lang}` : ""}`);
   $("#proposals").innerHTML = list.length ? list.map((p) => `
     <div class="item">
-      <div><b>${esc(p.source_text)}</b> <span class="tag">${esc(langName(p.source_lang))}</span><br>
-        → ${esc(p.target_text)} <span class="tag">${esc(langName(p.target_lang))}</span></div>
+      <div>${p.kind === "dialogue" ? `<span class="tag">💬 dialogue · ${esc(langName(p.source_lang))}</span><br>
+        « ${esc(p.source_text)} »<br>→ réponse : <b>${esc(p.target_text)}</b>`
+        : `<b>${esc(p.source_text)}</b> <span class="tag">${esc(langName(p.source_lang))}</span><br>
+        → ${esc(p.target_text)} <span class="tag">${esc(langName(p.target_lang))}</span>`}</div>
       <div class="row" style="align-items:center">${progress(p.support, p.required)}
         <span class="muted">${p.support}/${p.required}</span>
         <button data-confirm="${p.id}">👍 Je confirme</button></div>
@@ -298,7 +397,7 @@ async function loadMine() {
   if (!state.user) { $("#mine").innerHTML = `<p class="muted">Connectez-vous pour voir vos contributions.</p>`; return; }
   const list = await api("/api/contributions/mine");
   $("#mine").innerHTML = list.length ? list.map((c) => `
-    <div class="item"><div>${c.kind === "voix" ? "🎙️ " : ""}<b>${esc(c.source_text)}</b> → ${esc(c.target_text)}
+    <div class="item"><div>${c.type === "dialogue" ? "💬 " : ""}${c.kind === "voix" ? "🎙️ " : ""}<b>${esc(c.source_text)}</b> → ${esc(c.target_text)}
       ${c.audio_url ? `<audio controls src="${esc(withToken(c.audio_url))}"></audio>` : ""}</div>
       <div class="row" style="align-items:center"><span class="tag">${esc(statusLabel[c.status] || c.status)}</span>
       ${c.status === "collecte" ? `${progress(c.support, c.required)}<span class="muted">${c.support}/${c.required}</span>` : ""}</div></div>`).join("")
@@ -370,7 +469,9 @@ async function loadAdmin() {
   const pending = status === "en_attente_admin";
   $("#admin-list").innerHTML = list.length ? list.map((p) => `
     <div class="card" data-pid="${p.id}">
-      <div class="row" style="justify-content:space-between"><b>#${p.id} · ${esc(langName(p.source_lang))} → ${esc(langName(p.target_lang))}</b>
+      <div class="row" style="justify-content:space-between"><b>#${p.id} · ${p.kind === "dialogue"
+          ? `💬 Dialogue en ${esc(langName(p.source_lang))} (message → réponse)`
+          : `${esc(langName(p.source_lang))} → ${esc(langName(p.target_lang))}`}</b>
         <span class="tag">${p.support}/${p.required} contributeurs</span></div>
       ${pending ? `<div class="admin-edit">
           <input class="a-src" value="${esc(p.source_text)}"><input class="a-tgt" value="${esc(p.target_text)}"></div>`
@@ -404,6 +505,24 @@ tabLoaders.admin = loadAdmin;
   renderAccount();
   state.langs = await api("/api/languages");
   fillLangSelects();
+  setupModes();
+  $('[data-modes="chat"]').addEventListener("modechange", (e) => e.detail === "converse" && ensureCongolese($("#chat-src")));
+  $('[data-modes="voice"]').addEventListener("modechange", (e) => e.detail === "converse" && ensureCongolese($("#voice-src")));
+  $('[data-modes="contrib"]').addEventListener("modechange", (e) => {
+    if (e.detail === "converse") ensureCongolese($("#contrib-form [name=source_lang]"));
+    const btn = $("[data-recorder=contrib] button");
+    if (!btn.classList.contains("recording")) btn.textContent = e.detail === "converse"
+      ? "🎙️ Enregistrer la réponse à voix haute (optionnel)" : "🎙️ Enregistrer ma voix (optionnel)";
+  });
+  for (const sel of ["#chat-src", "#voice-src"]) $(sel).addEventListener("change", (e) => {
+    const key = sel === "#chat-src" ? "chat" : "voice";
+    convHistory[key] = [];  // nouvelle langue = nouvelle conversation
+    if (modeOf(key) === "converse") ensureCongolese(e.target);
+  });
+  api("/api/features").then((f) => {
+    $("#ai-badge").textContent = f.ai_conversation ? "🤖 IA active" : "📚 Réponses du dataset uniquement";
+    $("#ai-badge").title = f.ai_conversation ? "" : "Activez l'IA côté serveur (clé ANTHROPIC_API_KEY) pour converser librement";
+  }).catch(() => {});
   updateVoiceHint();
   if (state.token) api("/api/auth/me").then((u) => setSession({ token: state.token, user: u })).catch(() => {});
 })();

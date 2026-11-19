@@ -8,12 +8,14 @@ import tempfile
 from pathlib import Path
 
 os.environ["OKAPI_DATA_DIR"] = tempfile.mkdtemp(prefix="okapi_test_")
+os.environ["OKAPI_LLM_ENABLED"] = "0"  # jamais d'appel réseau pendant les tests
 os.environ["OKAPI_MODEL_DIR"] = os.path.join(os.environ["OKAPI_DATA_DIR"], "no-model")
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app.main import app  # noqa: E402
+from app.services import conversation  # noqa: E402
 
 
 def _user(c, name):
@@ -102,7 +104,65 @@ def test_voice_contribution_and_audio_access():
         assert r.status_code == 400
 
 
+def _admin(c):
+    return {"Authorization": "Bearer " + c.post(
+        "/api/auth/login", json={"username": "admin", "password": "admin123"}).json()["token"]}
+
+
+def test_conversation_dialogue_and_ai():
+    with TestClient(app) as c:
+        admin = _admin(c)
+        users = [_user(c, f"conv{i}") for i in range(10)]
+        dlg = {"kind": "dialogue", "source_lang": "ln", "source_text": "Ozali malamu?",
+               "target_lang": "ln", "target_text": "Ee, nazali malamu. Na yo?"}
+
+        r = c.post("/api/converse", json={"lang": "ln", "message": "Ozali malamu?"}).json()
+        assert r["reply"] is None and "Apprenez-moi" in r["hint"]
+
+        # dialogue dans deux langues différentes : refusé ; conversation en français : refusée
+        bad = {**dlg, "target_lang": "fr"}
+        assert c.post("/api/contributions/text", json=bad, headers=users[0]).status_code == 400
+        assert c.post("/api/converse", json={"lang": "fr", "message": "salut"}).status_code == 400
+
+        for h in users:
+            r = c.post("/api/contributions/text", json=dlg, headers=h)
+        assert r.json()["status"] == "en_attente_admin" and r.json()["kind"] == "dialogue"
+        pid = r.json()["proposition_id"]
+        pending = c.get("/api/admin/propositions", headers=admin).json()
+        assert any(p["id"] == pid and p["kind"] == "dialogue" for p in pending)
+        assert c.post(f"/api/admin/propositions/{pid}/approve", headers=admin).status_code == 200
+
+        r = c.post("/api/converse", json={"lang": "ln", "message": "ozali malamu"}).json()
+        assert r["reply"] == "Ee, nazali malamu. Na yo?" and r["method"] == "dataset"
+
+        # les dialogues ne polluent ni la traduction ni l'apprentissage
+        t = c.post("/api/translate", json={"text": "Ozali malamu?", "source_lang": "ln", "target_lang": "fr"}).json()
+        assert t["method"] != "dataset"
+        assert all(card["text"] != "Ozali malamu?" for card in c.get("/api/learn/cards?lang=ln&limit=50").json())
+
+        # IA simulée : reçoit les exemples validés, répond dans la langue
+        seen = {}
+
+        def fake_reply(lang, message, history, examples):
+            seen.update(lang=lang, history=history, examples=examples)
+            return {"reply": "Nazali malamu mingi", "reply_fr": "Je vais très bien"}
+
+        orig_enabled, orig_reply = conversation.claude_chat.enabled, conversation.claude_chat.reply
+        conversation.claude_chat.enabled = lambda: True
+        conversation.claude_chat.reply = fake_reply
+        try:
+            r = c.post("/api/converse", json={"lang": "ln", "message": "Mbote, ozali malamu mingi?",
+                                              "history": [{"role": "user", "text": "Mbote"},
+                                                          {"role": "assistant", "text": "Mbote na yo"}]}).json()
+        finally:
+            conversation.claude_chat.enabled, conversation.claude_chat.reply = orig_enabled, orig_reply
+        assert r["method"] == "ia" and r["reply"] == "Nazali malamu mingi" and r["reply_fr"] == "Je vais très bien"
+        assert "erreurs" in r["hint"] and seen["lang"] == "ln" and len(seen["history"]) == 2
+        assert any("Ozali malamu?" in e["texte"] for e in seen["examples"])
+
+
 if __name__ == "__main__":
     test_full_flow()
     test_voice_contribution_and_audio_access()
+    test_conversation_dialogue_and_ai()
     print("OK")

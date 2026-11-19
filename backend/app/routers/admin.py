@@ -25,7 +25,7 @@ def _detail(db: Session, p: Proposition) -> dict:
     for c in p.contributions:
         variants[(c.source_text, c.target_text)] = variants.get((c.source_text, c.target_text), 0) + 1
     return {
-        "id": p.id, "status": p.status, "source_lang": p.source_lang, "target_lang": p.target_lang,
+        "id": p.id, "kind": p.kind, "status": p.status, "source_lang": p.source_lang, "target_lang": p.target_lang,
         "source_text": src, "target_text": tgt,
         "support": dataset.support_count(db, p.id), "required": MIN_SIMILAR,
         "variants": [{"source_text": s, "target_text": t, "count": n}
@@ -91,7 +91,7 @@ def export_training(_: User = Depends(get_admin), db: Session = Depends(get_db))
     lines = []
     for e in db.scalars(select(TrainingEntry).order_by(TrainingEntry.id)):
         lines.append(json.dumps({
-            "id": e.id, "source_lang": e.source_lang, "source_text": e.source_text,
+            "id": e.id, "kind": e.kind, "source_lang": e.source_lang, "source_text": e.source_text,
             "target_lang": e.target_lang, "target_text": e.target_text,
             "audio": e.audio_path, "support": e.support_count,
         }, ensure_ascii=False))

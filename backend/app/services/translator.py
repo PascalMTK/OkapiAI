@@ -7,7 +7,7 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from ..config import LOOKUP_THRESHOLD, MODEL_DIR, NLLB_CODES
-from ..models import TrainingEntry
+from ..models import TRADUCTION, TrainingEntry
 from ..similarity import normalize, similarity
 
 log = logging.getLogger("okapiai.translator")
@@ -18,7 +18,7 @@ def audio_url(path: Optional[str]) -> Optional[str]:
 
 
 def _entries(db: Session, src: str, tgt: str) -> list[TrainingEntry]:
-    return list(db.scalars(select(TrainingEntry).where(or_(
+    return list(db.scalars(select(TrainingEntry).where(TrainingEntry.kind == TRADUCTION, or_(
         and_(TrainingEntry.source_lang == src, TrainingEntry.target_lang == tgt),
         and_(TrainingEntry.source_lang == tgt, TrainingEntry.target_lang == src),
     ))))

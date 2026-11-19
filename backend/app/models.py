@@ -26,6 +26,10 @@ EN_ATTENTE = "en_attente_admin"  # seuil atteint, attend la décision de l'admin
 APPROUVE = "approuve"            # copiée dans le dataset d'entraînement
 REJETE = "rejete"
 
+# Types de données
+TRADUCTION = "traduction"  # phrase (langue A) -> traduction (langue B)
+DIALOGUE = "dialogue"      # message -> réponse, dans la MÊME langue (pour converser)
+
 
 class User(Base):
     __tablename__ = "users"
@@ -42,6 +46,7 @@ class Proposition(Base):
     __tablename__ = "propositions"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16), default=TRADUCTION, server_default=TRADUCTION, index=True)
     source_lang: Mapped[str] = mapped_column(String(8), index=True)
     target_lang: Mapped[str] = mapped_column(String(8), index=True)
     source_norm: Mapped[str] = mapped_column(Text, index=True)
@@ -68,7 +73,8 @@ class Contribution(Base):
     source_text: Mapped[str] = mapped_column(Text)
     target_lang: Mapped[str] = mapped_column(String(8))
     target_text: Mapped[str] = mapped_column(Text)
-    audio_path: Mapped[Optional[str]] = mapped_column(String(255))  # voix qui prononce source_text
+    # voix qui prononce source_text (traduction) ou la réponse target_text (dialogue)
+    audio_path: Mapped[Optional[str]] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
 
     proposition: Mapped[Proposition] = relationship(back_populates="contributions")
@@ -81,6 +87,7 @@ class TrainingEntry(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     proposition_id: Mapped[int] = mapped_column(ForeignKey("propositions.id"), unique=True)
+    kind: Mapped[str] = mapped_column(String(16), default=TRADUCTION, server_default=TRADUCTION, index=True)
     source_lang: Mapped[str] = mapped_column(String(8), index=True)
     source_text: Mapped[str] = mapped_column(Text)
     source_norm: Mapped[str] = mapped_column(Text, index=True)
