@@ -23,6 +23,7 @@ from ..models import DIALOGUE, TRADUCTION, TrainingEntry
 from ..similarity import normalize, similarity
 from . import translator
 from .basics import basic_reply
+from .corpus import corpus
 from .lexicon import key, lexicon
 from .llm import claude_chat
 
@@ -87,7 +88,7 @@ def _say(lang: str, kind: str, **kw) -> tuple[str, str]:
 
 
 def answer_word_question(db: Session, lang: str, kind: str, term: str, history: list[dict]) -> dict:
-    out = {"reply": None, "reply_fr": None, "method": None, "audio_url": None, "word": None}
+    out = {"reply": None, "reply_fr": None, "method": None, "audio_url": None, "word": None, "example": None}
     ou = _SAY.get(lang, {}).get("ou", " ou ")
     if kind == "sens":
         # 1. traduction validée par la communauté
@@ -115,7 +116,8 @@ def answer_word_question(db: Session, lang: str, kind: str, term: str, history: 
                     fr += (f" « {term} » est le pluriel de « {main['word']} »." if plural
                            else f" (mot le plus proche de « {term} »)")
                 out.update(reply=reply, reply_fr=fr, method="lexique",
-                           word={"term": term, "meanings": meanings})
+                           word={"term": term, "meanings": meanings},
+                           example=corpus.example_with(term) or corpus.example_with(main["word"]))
                 return out
     else:
         # « comment dit-on X ? » : traduction validée, puis dictionnaire inversé
@@ -130,7 +132,8 @@ def answer_word_question(db: Session, lang: str, kind: str, term: str, history: 
             return out
     # 3. IA (si configurée), sinon : « je ne connais pas encore ce mot »
     question = f"Que veut dire « {term} » ?" if kind == "sens" else f"Comment dit-on « {term} » en {LANGUAGES[lang]} ?"
-    ai = claude_chat.reply(lang, question, history, lexicon.examples_for(term) if lang == "ln" else [])
+    hints = lexicon.examples_for(term) + corpus.examples_for_ai(term, k=4) if lang == "ln" else []
+    ai = claude_chat.reply(lang, question, history, hints)
     if ai:
         out.update(reply=ai["reply"], reply_fr=ai["reply_fr"], method="ia")
         return out
@@ -169,7 +172,8 @@ def grounding_examples(db: Session, lang: str, query: str) -> list[dict]:
 
 def converse(db: Session, lang: str, message: str, history: list[dict]) -> dict:
     out = {"lang": lang, "message": message, "reply": None, "reply_fr": None,
-           "method": None, "audio_url": None, "word": None, "ai_available": claude_chat.enabled()}
+           "method": None, "audio_url": None, "word": None, "example": None,
+           "ai_available": claude_chat.enabled()}
     query = normalize(message)
     if not query:
         return out
@@ -207,7 +211,7 @@ def converse(db: Session, lang: str, message: str, history: list[dict]) -> dict:
     # 3. IA ancrée sur le dataset validé et le dictionnaire
     examples = grounding_examples(db, lang, query)
     if lang == "ln":
-        examples += lexicon.examples_for(message)
+        examples += lexicon.examples_for(message) + corpus.examples_for_ai(message)
     ai = claude_chat.reply(lang, message, history, examples)
     if ai:
         out.update(reply=ai["reply"], reply_fr=ai["reply_fr"], method="ia")

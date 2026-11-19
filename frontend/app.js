@@ -303,7 +303,12 @@ function renderAnswer(log, lang, userMsg, a, key) {
   const html = a.reply
     ? `<p class="text-base font-semibold">${esc(a.reply)}</p>
        ${a.reply_fr ? `<details class="mt-1 text-xs text-slate-500 dark:text-slate-400"><summary class="cursor-pointer text-blue-700 dark:text-okapi-cyan font-semibold">🇫🇷 En français</summary><p class="mt-1 italic">${esc(a.reply_fr)}</p></details>` : ""}
-       ${audioTag(a.audio_url)}`
+       ${audioTag(a.audio_url)}
+       ${a.example ? `<div class="mt-2 p-2.5 rounded-lg bg-amber-50 dark:bg-okapi-yellow/10 border border-amber-200 dark:border-okapi-yellow/25 text-xs">
+          <span class="font-bold text-amber-800 dark:text-okapi-yellow">📖 Exemple, lu par un locuteur :</span>
+          <span class="italic text-slate-800 dark:text-slate-200">« ${esc(a.example.text)} »</span>
+          <span class="block text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">${esc(a.example.source)}</span>
+          ${audioTag(a.example.audio_url)}</div>` : ""}`
     : `<p>🤔 ${esc(a.hint || "Je ne sais pas encore répondre.")}</p>`;
   const listen = a.reply && (a.tts_url || a.audio_url)
     ? `<button type="button" class="b-listen ${smallBtn}"><i data-lucide="volume-2" class="w-3.5 h-3.5"></i>Écouter</button>` : "";

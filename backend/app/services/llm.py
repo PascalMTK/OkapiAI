@@ -26,7 +26,7 @@ from ..config import LANGUAGES
 
 log = logging.getLogger("okapiai.llm")
 
-TIMEOUT = float(os.getenv("OKAPI_LLM_TIMEOUT", "25"))
+TIMEOUT = float(os.getenv("OKAPI_LLM_TIMEOUT", "15"))
 COOLDOWN = float(os.getenv("OKAPI_LLM_COOLDOWN", "60"))
 
 LANG_DETAILS = {
@@ -43,6 +43,7 @@ Règles :
 - N'utilise jamais l'anglais. Si tu dois expliquer un mot, donne son sens en français.
 - Phrases courtes, simples et naturelles, adaptées à l'oral (la réponse peut être lue à voix haute).
 - Les exemples validés par la communauté (fournis avec chaque message) sont la référence : réutilise leur vocabulaire, leur orthographe et leurs tournures quand c'est pertinent.
+- Les phrases marquées « corpus LRSC » sont du lingala correct lu par des locuteurs natifs, sans traduction : inspire-toi de leurs mots, de leurs conjugaisons et de leur orthographe, mais ne les recopie pas si elles n'ont pas de rapport avec la conversation.
 - Si tu n'es pas sûr d'un mot, choisis une formulation plus simple que tu maîtrises plutôt que d'inventer un mot.
 - Sois chaleureux et respectueux, comme dans une conversation entre Congolais.
 - Fais vivre la conversation : quand c'est naturel, termine par une courte question pour que l'utilisateur continue à parler dans la langue.
@@ -153,9 +154,10 @@ class OpenAICompatProvider:
             if exc.code == 400 and self.json_mode and "response_format" in detail:
                 self.json_mode = False  # modèle sans mode JSON : on réessaie sans
                 return self.complete(system, messages)
-            raise ProviderError(f"HTTP {exc.code} : {detail}", rate_limited=exc.code == 429)
+            # 429 = limite gratuite, 503 = service saturé : on le met de côté un moment
+            raise ProviderError(f"HTTP {exc.code} : {detail}", rate_limited=exc.code in (429, 503))
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
-            raise ProviderError(f"injoignable : {exc}")
+            raise ProviderError(f"injoignable : {exc}", rate_limited=True)  # trop lent : idem
         try:
             text = data["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError):

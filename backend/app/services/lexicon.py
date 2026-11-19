@@ -32,7 +32,8 @@ _FORM = re.compile(r"^(infinitif|pluriel|variante orthographique|variante) de ",
 
 def key(text: str) -> str:
     """Forme de comparaison : minuscules, sans tons/accents, ɛ→e, ɔ→o, sans ponctuation."""
-    t = (text or "").lower().replace("ɛ", "e").replace("ɔ", "o").replace("’", "'")
+    # ε (epsilon grec) apparaît à la place de ɛ dans certaines transcriptions (LRSC)
+    t = (text or "").lower().replace("ɛ", "e").replace("ε", "e").replace("ɔ", "o").replace("’", "'")
     t = "".join(c for c in unicodedata.normalize("NFD", t) if unicodedata.category(c) != "Mn")
     t = re.sub(r"[^\w\s'-]", " ", t).strip(" -'")
     return " ".join(t.split())

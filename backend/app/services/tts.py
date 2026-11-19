@@ -13,7 +13,9 @@ Comme pour la reconnaissance, une voix n'est utilisée que si elle est déjà t�
 import hashlib
 import logging
 import os
+import re
 import threading
+import unicodedata
 import wave
 from pathlib import Path
 from typing import Optional
@@ -30,6 +32,24 @@ AUTO_DOWNLOAD = os.getenv("OKAPI_TTS_AUTO_DOWNLOAD") == "1"
 ENABLED = os.getenv("OKAPI_TTS", "on") != "off"
 TTS_DIR = AUDIO_DIR / "tts"
 MAX_CHARS = 600
+CACHE_VERSION = "v2"  # à changer quand la préparation du texte change (invalide l'ancien cache)
+PAUSE_S = 0.35        # silence entre deux phrases
+
+
+def speakable(text: str) -> str:
+    """Texte que la voix MMS sait prononcer : elle ne connaît que a-z (sans tons).
+    Sans ça, « tóyékola » devient « tykola » et « mbɔ́tɛ » devient « mbt »."""
+    t = (text.replace("ɛ", "e").replace("Ɛ", "E").replace("ε", "e").replace("Ε", "E")
+         .replace("ɔ", "o").replace("Ɔ", "O"))
+    t = "".join(c for c in unicodedata.normalize("NFD", t) if unicodedata.category(c) != "Mn")
+    t = re.sub(r"[«»\"“”()\[\]*_#]", " ", t)
+    return " ".join(t.split())
+
+
+def sentences(text: str) -> list[str]:
+    """Découpe en phrases : la voix ignore la ponctuation, on ajoute donc les pauses nous-mêmes."""
+    parts = re.split(r"(?<=[.!?;:…])\s+|\n+", text)
+    return [p.strip(" .,!?;:…") for p in parts if re.search(r"\w", p)]
 
 
 class Synthesizer:
@@ -76,7 +96,7 @@ class Synthesizer:
                         self._failed.add(lang)
 
     def path_for(self, text: str, lang: str) -> Path:
-        digest = hashlib.sha1(f"{lang}|{text}".encode("utf-8")).hexdigest()[:24]
+        digest = hashlib.sha1(f"{CACHE_VERSION}|{lang}|{text}".encode("utf-8")).hexdigest()[:24]
         return TTS_DIR / f"{lang}-{digest}.wav"
 
     def synthesize(self, text: str, lang: str) -> Optional[Path]:
@@ -95,21 +115,29 @@ class Synthesizer:
                 self._failed.add(lang)
                 return None
             try:
+                import numpy as np
                 import torch
-                # Les voix MMS ne connaissent pas les guillemets ni certains signes : on les retire
-                clean = text.replace("«", "").replace("»", "").replace("…", ".")
-                inputs = tok(clean, return_tensors="pt").to(model.device)
-                if inputs["input_ids"].shape[-1] == 0:
+                rate = model.config.sampling_rate
+                pieces = []
+                for sentence in sentences(speakable(text)):
+                    inputs = tok(sentence, return_tensors="pt").to(model.device)
+                    if inputs["input_ids"].shape[-1] <= 1:
+                        continue
+                    with torch.inference_mode():
+                        wav = model(**inputs).waveform[0].float().cpu().numpy()
+                    if pieces:
+                        pieces.append(np.zeros(int(rate * PAUSE_S), dtype=np.float32))
+                    pieces.append(wav)
+                if not pieces:
                     return None
-                with torch.inference_mode():
-                    wav = model(**inputs).waveform[0].float().cpu().numpy()
+                wav = np.concatenate(pieces)
                 pcm = (wav.clip(-1, 1) * 32767).astype("<i2").tobytes()
                 TTS_DIR.mkdir(parents=True, exist_ok=True)
                 tmp = path.with_suffix(".tmp")
                 with wave.open(str(tmp), "wb") as w:
                     w.setnchannels(1)
                     w.setsampwidth(2)
-                    w.setframerate(model.config.sampling_rate)
+                    w.setframerate(rate)
                     w.writeframes(pcm)
                 tmp.replace(path)
                 return path

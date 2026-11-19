@@ -12,6 +12,7 @@ from ..database import get_db
 from ..schemas import ChatTurn, ConverseIn, TranslateIn, check_langs
 from ..services import conversation, translator
 from ..services.audio import save_audio
+from ..services.corpus import corpus
 from ..services.speech import recognizer
 from ..services.tts import MAX_CHARS, synthesizer
 
@@ -42,6 +43,15 @@ def tts(text: str = Query(..., min_length=1, max_length=MAX_CHARS), lang: str = 
     if path is None:
         raise HTTPException(404, f"Pas de voix disponible pour le {LANGUAGES[lang].lower()}")
     return FileResponse(path, media_type="audio/wav", headers={"Cache-Control": "public, max-age=86400"})
+
+
+@router.get("/corpus/audio/{rel:path}")
+def corpus_audio(rel: str):
+    """Enregistrement d'une phrase du corpus LRSC (voix d'un vrai locuteur, CC BY 4.0)."""
+    path = corpus.audio_path(rel)
+    if path is None:
+        raise HTTPException(404, "Enregistrement introuvable")
+    return FileResponse(path, media_type="audio/wav", headers={"Cache-Control": "public, max-age=604800"})
 
 
 def tts_url(text: str, lang: str):

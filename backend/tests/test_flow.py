@@ -188,6 +188,8 @@ def test_conversation_dialogue_and_ai():
         assert r["method"] == "ia" and r["reply"] == "Nazali malamu mingi" and r["reply_fr"] == "Je vais très bien"
         assert "erreurs" in r["hint"] and seen["lang"] == "ln" and len(seen["history"]) == 2
         assert any("Ozali malamu?" in e["texte"] for e in seen["examples"])
+        # l'IA reçoit aussi des phrases de lingala correct du corpus LRSC
+        assert any("LRSC" in e["sens"] for e in seen["examples"]), seen["examples"]
 
 
 def test_word_meaning():
@@ -207,6 +209,13 @@ def test_word_meaning():
 
         r = ask("ndako")  # mot seul
         assert r["method"] == "lexique" and "maison" in r["reply"]
+        # exemple d'usage tiré du corpus LRSC (avec l'enregistrement s'il est présent sur le disque)
+        assert r["example"] and "ndako" in r["example"]["text"] and "LRSC" in r["example"]["source"]
+        if r["example"]["audio_url"]:
+            audio = c.get(r["example"]["audio_url"])
+            assert audio.status_code == 200 and audio.headers["content-type"] == "audio/wav"
+        assert c.get("/api/corpus/audio/../../.env").status_code == 404  # pas d'accès hors du corpus
+        assert c.get("/api/corpus/audio/train/..%2F..%2Fmetadata.jsonl").status_code == 404
 
         r = ask("mbɔ́tɛ elingi koloba nini?")  # avec les tons
         assert r["method"] == "lexique" and "bonjour" in r["reply"]
