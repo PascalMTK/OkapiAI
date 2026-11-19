@@ -172,7 +172,7 @@ def test_conversation_dialogue_and_ai():
         # IA simulée : reçoit les exemples validés, répond dans la langue
         seen = {}
 
-        def fake_reply(lang, message, history, examples):
+        def fake_reply(lang, message, history, examples, voice=False):
             seen.update(lang=lang, history=history, examples=examples)
             return {"reply": "Nazali malamu mingi", "reply_fr": "Je vais très bien"}
 
@@ -264,11 +264,38 @@ def test_voice_live_conversation():
             assert r["answer"]["method"] == "base" and r["answer"]["reply"].startswith("Nzuri")
             assert r["answer"]["tts_url"].startswith("/api/tts?lang=sw&text=")
 
+            # voix live en 2 étapes : transcription d'abord, puis réponse (voice=true)
+            t = c.post("/api/voice/transcribe", files={"audio": fake}, data={"lang": "auto"}).json()
+            assert t["transcript"] == "habari yako" and t["lang"] == "sw" and t["answer"] is None
+            r = c.post("/api/converse", json={"lang": t["lang"], "message": t["transcript"], "voice": True}).json()
+            assert r["reply"].startswith("Nzuri") and r["tts_url"]
+
             # langue choisie : lingala
             r = c.post("/api/voice/converse", files={"audio": fake}, data={"lang": "ln"}).json()
             assert r["lang"] == "ln" and r["answer"]["reply"].startswith("Mbote")
             audio = c.get(r["answer"]["tts_url"])
             assert audio.status_code == 200 and audio.headers["content-type"] == "audio/wav"
+
+            # ouverture de la voix live : OkapiAI salue et pose une question, avec sa voix
+            s = c.get("/api/voice/start", params={"lang": "auto"}).json()
+            assert s["lang"] == "ln" and s["reply"].endswith("?") and s["tts_url"] and s["asr"] is True
+            assert s["retry"]["sw"]["reply"] and s["retry"]["ln"]["tts_url"]
+
+            # en voix live, l'IA reçoit la consigne « réponses courtes qui relancent l'échange »
+            seen = {}
+
+            def fake_ai(lang, message, history, examples, voice=False):
+                seen["voice"] = voice
+                return {"reply": "Ezali malamu. Yo olingaka nini ?", "reply_fr": "C'est bien. Et toi, qu'aimes-tu ?"}
+
+            orig = conversation.claude_chat.enabled, conversation.claude_chat.reply
+            conversation.claude_chat.enabled, conversation.claude_chat.reply = (lambda: True), fake_ai
+            rec.transcribe = lambda path, lang: "Motuka na ngai ebebi lobi"
+            try:
+                r = c.post("/api/voice/converse", files={"audio": fake}, data={"lang": "ln"}).json()
+            finally:
+                conversation.claude_chat.enabled, conversation.claude_chat.reply = orig
+            assert r["answer"]["method"] == "ia" and seen["voice"] is True
 
             # pas de voix pour le kikongo : pas d'URL, et /api/tts répond 404
             r = c.post("/api/converse", json={"lang": "kg", "message": "mbote"}).json()

@@ -141,10 +141,27 @@ def tag_video(vid, fe, model, dev, i_ln, i_fr, vocab_out):
     print(f"[{vid}] {counts}", flush=True)
 
 
+def is_tagged(vid):
+    p = CLIPS / vid / "metadata.jsonl"
+    return p.exists() and '"lang":' in p.read_text(encoding="utf-8")
+
+
 if __name__ == "__main__":
-    vids = sys.argv[1:] or sorted(p.name for p in CLIPS.iterdir() if p.is_dir())
+    import io
+    force = "--force" in sys.argv
+    args = [a for a in sys.argv[1:] if a != "--force"]
+    vids = args or sorted(p.name for p in CLIPS.iterdir() if p.is_dir())
+    todo = [v for v in vids if force or not is_tagged(v)]
+    print(f"{len(todo)} videos to tag ({len(vids) - len(todo)} already tagged, use --force to redo)")
+    if not todo:
+        sys.exit()
     fe, model, dev, i_ln, i_fr = load_model()
     print(f"model on {dev}")
-    with open(ROOT / "dataset" / "vocab_candidates.jsonl", "w", encoding="utf-8") as vocab_out:
-        for vid in vids:
-            tag_video(vid, fe, model, dev, i_ln, i_fr, vocab_out)
+    vocab_path = ROOT / "dataset" / "vocab_candidates.jsonl"
+    for vid in todo:
+        buf = io.StringIO()
+        tag_video(vid, fe, model, dev, i_ln, i_fr, buf)
+        # replace only this video's candidates, keep the others
+        old = vocab_path.read_text(encoding="utf-8").splitlines() if vocab_path.exists() else []
+        kept = [l for l in old if l.strip() and json.loads(l)["video_id"] != vid]
+        vocab_path.write_text("".join(l + "\n" for l in kept) + buf.getvalue(), encoding="utf-8")

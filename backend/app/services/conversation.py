@@ -170,7 +170,7 @@ def grounding_examples(db: Session, lang: str, query: str) -> list[dict]:
     return [it for _, _, it in scored[:MAX_EXAMPLES]]
 
 
-def converse(db: Session, lang: str, message: str, history: list[dict]) -> dict:
+def converse(db: Session, lang: str, message: str, history: list[dict], voice: bool = False) -> dict:
     out = {"lang": lang, "message": message, "reply": None, "reply_fr": None,
            "method": None, "audio_url": None, "word": None, "example": None,
            "ai_available": claude_chat.enabled()}
@@ -212,7 +212,7 @@ def converse(db: Session, lang: str, message: str, history: list[dict]) -> dict:
     examples = grounding_examples(db, lang, query)
     if lang == "ln":
         examples += lexicon.examples_for(message) + corpus.examples_for_ai(message)
-    ai = claude_chat.reply(lang, message, history, examples)
+    ai = claude_chat.reply(lang, message, history, examples, voice=voice)
     if ai:
         out.update(reply=ai["reply"], reply_fr=ai["reply_fr"], method="ia")
     return out

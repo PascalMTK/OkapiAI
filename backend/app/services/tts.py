@@ -28,6 +28,10 @@ VOICES = {
     "ln": os.getenv("OKAPI_TTS_LN", "khof312/mms-tts-lin"),
     "sw": os.getenv("OKAPI_TTS_SW", "facebook/mms-tts-swh"),
 }
+# Voix externes (ex. voix affinée sur notre dataset, tools/voice_server.py) : OKAPI_TTS_<LANG>_URL.
+# Utilisées en priorité ; si elles ne répondent pas, on revient à la voix MMS.
+REMOTE = {lang: url.rstrip("/") for lang in ("ln", "sw")
+          if (url := os.getenv(f"OKAPI_TTS_{lang.upper()}_URL"))}
 AUTO_DOWNLOAD = os.getenv("OKAPI_TTS_AUTO_DOWNLOAD") == "1"
 ENABLED = os.getenv("OKAPI_TTS", "on") != "off"
 TTS_DIR = AUDIO_DIR / "tts"
@@ -57,8 +61,37 @@ class Synthesizer:
         self._lock = threading.Lock()
         self._voices: dict[str, tuple] = {}
         self._failed: set[str] = set()
+        self._remote_state: dict[str, tuple[bool, float]] = {}
+
+    def _remote_ok(self, lang: str) -> bool:
+        """La voix externe répond-elle ? (vérifié au plus une fois toutes les 30 s)"""
+        import time
+        import urllib.request
+        url = REMOTE.get(lang)
+        if not url:
+            return False
+        now = time.monotonic()
+        cached = self._remote_state.get(lang)
+        if cached and now - cached[1] < 30:
+            return cached[0]
+        try:
+            with urllib.request.urlopen(f"{url}/health", timeout=2) as r:
+                ok = r.status == 200
+        except Exception:
+            ok = False
+        self._remote_state[lang] = (ok, now)
+        return ok
+
+    def engine(self, lang: str) -> Optional[str]:
+        """Nom de la voix utilisée pour `lang` (externe affinée ou MMS)."""
+        if self._remote_ok(lang):
+            return "remote"
+        return "mms" if self._mms_supports(lang) else None
 
     def supports(self, lang: str) -> bool:
+        return ENABLED and self.engine(lang) is not None
+
+    def _mms_supports(self, lang: str) -> bool:
         if not ENABLED or lang not in VOICES or lang in self._failed:
             return False
         if lang in self._voices:
@@ -87,7 +120,7 @@ class Synthesizer:
     def warmup(self) -> None:
         """Charge les voix disponibles à l'avance (appelé au démarrage, en arrière-plan)."""
         for lang in VOICES:
-            if self.supports(lang):
+            if self._mms_supports(lang):
                 with self._lock:
                     try:
                         self._voice(lang)
@@ -95,15 +128,36 @@ class Synthesizer:
                         log.warning("Voix %s indisponible : %s", lang, exc)
                         self._failed.add(lang)
 
-    def path_for(self, text: str, lang: str) -> Path:
-        digest = hashlib.sha1(f"{CACHE_VERSION}|{lang}|{text}".encode("utf-8")).hexdigest()[:24]
-        return TTS_DIR / f"{lang}-{digest}.wav"
+    def path_for(self, text: str, lang: str, engine: str = "mms") -> Path:
+        digest = hashlib.sha1(f"{CACHE_VERSION}|{engine}|{lang}|{text}".encode("utf-8")).hexdigest()[:24]
+        return TTS_DIR / f"{lang}-{engine}-{digest}.wav"
+
+    def _synthesize_remote(self, text: str, lang: str) -> Optional[Path]:
+        import urllib.parse
+        import urllib.request
+        # pas de cache : la voix affinée change pendant l'entraînement
+        path = TTS_DIR / f"{lang}-remote-{hashlib.sha1(text.encode('utf-8')).hexdigest()[:24]}.wav"
+        try:
+            url = f"{REMOTE[lang]}/tts?text={urllib.parse.quote(text)}"
+            with urllib.request.urlopen(url, timeout=30) as r:
+                data = r.read()
+        except Exception as exc:
+            log.warning("Voix externe %s indisponible : %s -> voix MMS", lang, exc)
+            self._remote_state[lang] = (False, __import__("time").monotonic())
+            return None
+        TTS_DIR.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        return path
 
     def synthesize(self, text: str, lang: str) -> Optional[Path]:
         """Fichier WAV de `text` prononcé dans `lang`, ou None si impossible."""
         text = " ".join((text or "").split())[:MAX_CHARS]
         if not text or not self.supports(lang):
             return None
+        if self.engine(lang) == "remote":
+            path = self._synthesize_remote(text, lang)
+            if path is not None or not self._mms_supports(lang):
+                return path
         path = self.path_for(text, lang)
         if path.exists():
             return path

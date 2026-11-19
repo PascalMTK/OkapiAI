@@ -21,8 +21,14 @@ from typing import Optional
 log = logging.getLogger("okapiai.speech")
 
 ASR_ENGINE = os.getenv("OKAPI_ASR", "mms")             # mms | whisper | off
-MMS_MODEL = os.getenv("OKAPI_ASR_MODEL", "facebook/mms-1b-all")
+# Copie locale (backend/models/mms-1b-all, ex. sur un autre disque) si elle existe, sinon le cache Hugging Face
+_LOCAL_MMS = Path(__file__).resolve().parents[2] / "models" / "mms-1b-all"
+MMS_MODEL = os.getenv("OKAPI_ASR_MODEL") or (str(_LOCAL_MMS) if (_LOCAL_MMS / "model.safetensors").exists()
+                                            else "facebook/mms-1b-all")
 AUTO_DOWNLOAD = os.getenv("OKAPI_ASR_AUTO_DOWNLOAD") == "1"
+# auto = carte graphique si disponible ; cpu = processeur (utile quand la carte est occupée, ~4 s/phrase)
+ASR_DEVICE = os.getenv("OKAPI_ASR_DEVICE", "auto")
+SURE = 0.92  # détection automatique : au-delà de cette confiance, inutile d'essayer l'autre langue
 MMS_LANGS = {"ln": "lin", "sw": "swh", "fr": "fra"}
 WHISPER_LANGS = {"fr": "fr", "sw": "sw", "ln": "ln"}
 WHISPER_SIZE = os.getenv("OKAPI_WHISPER_MODEL", "small")
@@ -61,9 +67,11 @@ class MMSRecognizer:
             return False
         if AUTO_DOWNLOAD:
             return True
+        needed = ("model.safetensors", "adapter.lin.safetensors")
+        if Path(MMS_MODEL).is_dir():
+            return all((Path(MMS_MODEL) / f).is_file() for f in needed)
         from huggingface_hub import try_to_load_from_cache
-        return all(isinstance(try_to_load_from_cache(MMS_MODEL, f), str)
-                   for f in ("model.safetensors", "adapter.lin.safetensors"))
+        return all(isinstance(try_to_load_from_cache(MMS_MODEL, f), str) for f in needed)
 
     def _load(self):
         if self._model is not None or self._failed:
@@ -71,7 +79,9 @@ class MMSRecognizer:
         try:
             import torch
             from transformers import AutoProcessor, Wav2Vec2ForCTC
-            self._device = "cuda" if torch.cuda.is_available() else "cpu"
+            self._device = ASR_DEVICE if ASR_DEVICE in ("cpu", "cuda") else ("cuda" if torch.cuda.is_available() else "cpu")
+            if self._device == "cpu":
+                torch.set_num_threads(max(2, (os.cpu_count() or 4) - 2))
             self._proc = AutoProcessor.from_pretrained(MMS_MODEL, target_lang="lin")
             model = Wav2Vec2ForCTC.from_pretrained(MMS_MODEL, target_lang="lin", ignore_mismatched_sizes=True)
             dtype = torch.float16 if self._device == "cuda" else torch.float32
@@ -122,6 +132,8 @@ class MMSRecognizer:
                 log.info("Détection : %s -> %.3f « %s »", lang, conf, text[:60])
                 if text and conf > best[2]:
                     best = (lang, text, conf)
+                if conf >= SURE:
+                    break  # langue reconnue avec assurance : on gagne le temps du 2e essai
             return best[0], best[1]
 
 
@@ -141,6 +153,11 @@ class WhisperRecognizer:
             return False
 
     def transcribe(self, path: Path, lang: str) -> Optional[str]:
+        # On décode nous-mêmes avec ffmpeg : le lecteur intégré de faster-whisper (PyAV) peut être
+        # incompatible avec la version installée (« unexpected keyword argument 'metadata_errors' »).
+        return self.transcribe_array(load_audio(path), lang)
+
+    def transcribe_array(self, audio, lang: str) -> Optional[str]:
         with self._lock:
             if self._model is None:
                 try:
@@ -150,8 +167,9 @@ class WhisperRecognizer:
                     log.warning("Whisper indisponible : %s", exc)
                     self._failed = True
                     return None
-        segments, _ = self._model.transcribe(str(path), language=WHISPER_LANGS[lang])
-        return " ".join(s.text.strip() for s in segments).strip() or None
+            segments, _ = self._model.transcribe(audio, language=WHISPER_LANGS[lang],
+                                                 vad_filter=True, beam_size=5)
+            return " ".join(s.text.strip() for s in segments).strip() or None
 
 
 class SpeechRecognizer:
@@ -186,6 +204,12 @@ class SpeechRecognizer:
         if ASR_ENGINE != "off" and self.mms.available():
             with self.mms._lock:
                 self.mms._load()
+        elif ASR_ENGINE != "off" and self.whisper.available():
+            import numpy as np
+            try:  # charge Whisper et fait un 1er passage à vide (sinon 20 s au 1er message)
+                self.whisper.transcribe_array(np.zeros(SAMPLE_RATE, dtype=np.float32), "ln")
+            except Exception as exc:
+                log.warning("Préchargement de Whisper impossible : %s", exc)
 
     def auto_langs(self) -> list[str]:
         """Langues nationales que l'on sait reconnaître automatiquement."""

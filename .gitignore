@@ -24,3 +24,6 @@ dataset/clips/**/*.wav
 dataset/sources/lrsc/**/*.wav
 dataset/sources/maloba/
 dataset/vocab_candidates.jsonl
+
+# Échantillons de test des voix (générés en local)
+comparaison-voix/

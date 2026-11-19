@@ -26,7 +26,7 @@ from ..config import LANGUAGES
 
 log = logging.getLogger("okapiai.llm")
 
-TIMEOUT = float(os.getenv("OKAPI_LLM_TIMEOUT", "15"))
+TIMEOUT = float(os.getenv("OKAPI_LLM_TIMEOUT", "12"))
 COOLDOWN = float(os.getenv("OKAPI_LLM_COOLDOWN", "60"))
 
 LANG_DETAILS = {
@@ -50,6 +50,13 @@ Règles :
 - Si l'utilisateur demande le sens d'un mot, explique-le dans la langue de la conversation (le sens peut être cité en français), en t'appuyant d'abord sur les entrées du dictionnaire fournies avec les exemples. Si le mot n'y figure pas et que tu n'es pas sûr, dis-le plutôt que d'inventer.
 - Fournis aussi une traduction française fidèle de ta réponse, pour les personnes qui apprennent la langue."""
 
+VOICE_RULE = """
+
+Conversation orale en direct (comme un appel) :
+- Réponds en 1 ou 2 phrases courtes (moins de 30 mots au total), sans listes, sans emojis ni symboles : tout est lu à voix haute.
+- Le plus souvent, termine par UNE question simple et naturelle sur la personne ou le sujet, pour que la conversation continue.
+- Si le message est incompréhensible ou coupé, demande gentiment de répéter, dans la langue."""
+
 JSON_RULE = ('\n\nRéponds UNIQUEMENT avec un objet JSON, sans texte autour : '
              '{"reply": "<ta réponse dans la langue de la conversation>", "reply_fr": "<sa traduction française>"}')
 
@@ -70,10 +77,11 @@ class ProviderError(Exception):
         self.rate_limited = rate_limited
 
 
-def build_messages(lang: str, message: str, history: list[dict], examples: list[dict]) -> tuple[str, list[dict]]:
+def build_messages(lang: str, message: str, history: list[dict], examples: list[dict],
+                   voice: bool = False) -> tuple[str, list[dict]]:
     """(prompt système, messages user/assistant alternés) communs à toutes les IA."""
     lang_name = LANGUAGES[lang]
-    system = SYSTEM_TEMPLATE.format(lang_details=LANG_DETAILS.get(lang, lang_name))
+    system = SYSTEM_TEMPLATE.format(lang_details=LANG_DETAILS.get(lang, lang_name)) + (VOICE_RULE if voice else "")
     messages: list[dict] = []
     for turn in history[-10:]:
         if not messages and turn["role"] != "user":
@@ -233,12 +241,14 @@ class LLMChain:
     def enabled(self) -> bool:
         return bool(self.active())
 
-    def reply(self, lang: str, message: str, history: list[dict], examples: list[dict]) -> Optional[dict]:
-        """{"reply", "reply_fr"} du premier service qui répond, ou None."""
+    def reply(self, lang: str, message: str, history: list[dict], examples: list[dict],
+              voice: bool = False) -> Optional[dict]:
+        """{"reply", "reply_fr"} du premier service qui répond, ou None.
+        `voice` : conversation orale en direct (réponses courtes qui relancent l'échange)."""
         providers = self.active()
         if not providers:
             return None
-        system, messages = build_messages(lang, message, history, examples)
+        system, messages = build_messages(lang, message, history, examples, voice=voice)
         now = time.monotonic()
         ready = [p for p in providers if self._paused.get(p.name, 0) <= now] or providers
         for p in ready:

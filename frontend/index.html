@@ -57,6 +57,22 @@
   </script>
 
   <style>
+
+    /* ---------- Voix live : orbe animé ---------- */
+    .live-orb { --lvl: 0; transform: scale(calc(1 + var(--lvl) * 0.28));
+      background: radial-gradient(circle at 35% 30%, #93c5fd, #1e7bff 45%, #0a3fb8 82%);
+      box-shadow: 0 0 calc(30px + var(--lvl) * 90px) rgba(30, 123, 255, .55), inset 0 -12px 30px rgba(0,0,0,.25);
+      transition: transform .09s linear, box-shadow .09s linear, filter .4s, opacity .4s; }
+    .live-orb[data-state="idle"], .live-orb[data-state="paused"] { filter: saturate(.55); opacity: .8; }
+    .live-orb[data-state="thinking"] { background: radial-gradient(circle at 35% 30%, #fef08a, #f7d618 45%, #b45309 85%);
+      box-shadow: 0 0 50px rgba(247, 214, 24, .55); animation: live-breathe 1.1s ease-in-out infinite; }
+    .live-orb[data-state="speaking"] { background: radial-gradient(circle at 35% 30%, #fecaca, #ce1021 45%, #7f1d1d 85%);
+      box-shadow: 0 0 calc(30px + var(--lvl) * 90px) rgba(206, 16, 33, .5); }
+    .live-orb[data-state="speaking"].no-level { animation: live-breathe .8s ease-in-out infinite; }
+    .live-orb .live-ring { position: absolute; inset: -16px; border-radius: 9999px; border: 2px solid rgba(247, 214, 24, .4); opacity: 0; }
+    .live-orb[data-state="listening"] .live-ring { animation: live-ripple 2s infinite ease-out; }
+    @keyframes live-ripple { 0% { transform: scale(.95); opacity: .8; } 100% { transform: scale(1.5); opacity: 0; } }
+    @keyframes live-breathe { 0%, 100% { transform: scale(.95); } 50% { transform: scale(1.07); } }
     /* Custom Scrollbar for sleek appearance */
     ::-webkit-scrollbar {
       width: 6px;
@@ -338,73 +354,52 @@
     </section>
 
     <!-- ==========================================
-         TAB 2: VOIX LIVE
+         TAB 2: VOIX LIVE — conversation en direct avec OkapiAI
          ========================================== -->
-    <section id="tab-voice" class="tab-section hidden space-y-6">
-      <div class="glass-panel rounded-2xl p-5 sm:p-6">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200 dark:border-okapi-blue/15">
-          <!-- Mode Switcher -->
-          <div class="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-obsidian-950/90 border border-slate-200 dark:border-okapi-blue/20 self-start" data-modes="voice">
-            <button type="button" data-mode="converse" class="mode-btn active flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer">
-              <i data-lucide="sparkles" class="w-4 h-4"></i>
-              <span>Dialogue Vocal</span>
-            </button>
-            <button type="button" data-mode="translate" class="mode-btn flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer">
-              <i data-lucide="globe" class="w-4 h-4"></i>
-              <span>Interprète Direct</span>
-            </button>
+    <section id="tab-voice" class="tab-section hidden">
+      <div class="glass-panel rounded-2xl p-5 sm:p-8 min-h-[600px] flex flex-col items-center">
+        <div class="w-full flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 class="font-display text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <span class="inline-block w-2.5 h-2.5 rounded-full bg-okapi-red" id="live-dot"></span> OkapiAI Live
+            </h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Parlez naturellement : OkapiAI vous écoute, vous répond à voix haute et vous pose des questions.</p>
           </div>
-
-          <!-- Language Controls -->
-          <div class="flex flex-wrap items-center gap-3">
-            <label class="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
-              <span>Je parle</span>
-              <select id="voice-src" class="lang-select bg-white dark:bg-obsidian-900 border border-slate-300 dark:border-okapi-blue/25 text-slate-800 dark:text-slate-100 text-sm font-semibold rounded-xl px-3 py-2 focus:outline-none focus:border-okapi-blue"></select>
-            </label>
-            <label class="converse-only flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 cursor-pointer select-none" title="OkapiAI détecte la fin de votre phrase, répond à voix haute puis vous réécoute">
-              <input id="voice-handsfree" type="checkbox" checked class="w-4 h-4 accent-okapi-blue cursor-pointer">
-              <span>Conversation continue (mains libres)</span>
-            </label>
-            <label class="translate-only hidden flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
-              <span>Traduire en</span>
-              <select id="voice-tgt" class="lang-select bg-white dark:bg-obsidian-900 border border-slate-300 dark:border-okapi-blue/25 text-slate-800 dark:text-slate-100 text-sm font-semibold rounded-xl px-3 py-2 focus:outline-none focus:border-okapi-blue"></select>
-            </label>
-          </div>
+          <label class="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+            <span>Langue</span>
+            <select id="live-lang" class="bg-white dark:bg-obsidian-900 border border-slate-300 dark:border-okapi-blue/25 text-slate-800 dark:text-slate-100 text-sm font-semibold rounded-xl px-3 py-2 focus:outline-none focus:border-okapi-blue"></select>
+          </label>
         </div>
 
-        <!-- Interactive Microphone Stage -->
-        <div class="py-12 sm:py-16 flex flex-col items-center justify-center text-center relative">
-          <div class="relative flex items-center justify-center">
-            <!-- Animated Ripple Rings -->
-            <span id="mic-ring-1" class="hidden absolute w-32 h-32 rounded-full bg-okapi-red/30 animate-ripple"></span>
-            <span id="mic-ring-2" class="hidden absolute w-44 h-44 rounded-full bg-okapi-yellow/35 animate-ripple" style="animation-delay: 0.4s;"></span>
-            
-            <button id="rec-btn" type="button" class="relative z-10 w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-gradient-to-b from-sky-400 via-okapi-blue to-blue-700 hover:brightness-105 text-white border-4 border-okapi-yellow shadow-xl shadow-okapi-blue/30 flex flex-col items-center justify-center gap-1.5 transition-all duration-300 active:scale-95 cursor-pointer group">
-              <i id="rec-icon" data-lucide="mic" class="w-9 h-9 text-okapi-yellow transition-transform group-hover:scale-110"></i>
-              <span id="rec-label" class="text-[11px] font-extrabold uppercase tracking-wider">Parler</span>
-            </button>
-          </div>
-
-          <p id="voice-hint" class="mt-6 text-sm font-bold text-slate-800 dark:text-slate-200">
-            Appuyez sur le microphone pour démarrer la reconnaissance vocale
-          </p>
-          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            <span id="voice-asr-info">Transcription automatique : swahili, lingala et français. En kikongo et en tshiluba, vous tapez ce que vous avez dit.</span>
-          </p>
+        <div class="flex-1 w-full flex flex-col items-center justify-center py-10">
+          <button id="live-orb" type="button" data-state="idle" aria-label="Parler avec OkapiAI"
+                  class="live-orb relative w-40 h-40 sm:w-52 sm:h-52 rounded-full cursor-pointer flex items-center justify-center focus:outline-none">
+            <span class="live-ring"></span>
+            <i data-lucide="audio-lines" class="w-12 h-12 text-white/90 drop-shadow"></i>
+          </button>
+          <p id="live-status" class="mt-10 text-base sm:text-lg font-bold text-slate-800 dark:text-slate-100 text-center">Appuyez sur « Commencer » pour parler avec OkapiAI</p>
+          <p id="live-user" class="mt-6 text-sm text-slate-500 dark:text-slate-400 italic max-w-xl text-center min-h-[1.25rem]"></p>
+          <p id="live-bot" class="mt-3 text-xl sm:text-2xl font-semibold text-slate-900 dark:text-white max-w-2xl text-center leading-snug min-h-[2rem]"></p>
+          <p id="live-bot-fr" class="hidden mt-2 text-sm text-slate-500 dark:text-slate-400 max-w-xl text-center"></p>
         </div>
 
-        <!-- Voice Transcription Log -->
-        <div class="border-t border-slate-200 dark:border-okapi-blue/15 pt-5">
-          <h3 class="text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-okapi-cyan mb-3 flex items-center gap-2">
-            <i data-lucide="audio-waveform" class="w-4 h-4 text-amber-500 dark:text-okapi-yellow"></i>
-            Transcription & Synthèse vocale
-          </h3>
-          <div id="voice-log" class="space-y-3 max-h-64 overflow-y-auto pr-1">
-            <div class="text-center py-6 text-xs text-slate-400 dark:text-slate-500 border border-dashed border-slate-300 dark:border-okapi-blue/25 rounded-xl bg-slate-50/50 dark:bg-transparent">
-              Aucune session vocale enregistrée pour le moment.
-            </div>
-          </div>
+        <div class="flex flex-wrap items-center justify-center gap-3">
+          <button id="live-start" type="button" class="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-okapi-blue to-blue-600 hover:brightness-110 text-white font-bold shadow-lg shadow-okapi-blue/30 cursor-pointer">
+            <i data-lucide="mic" class="w-5 h-5"></i> Commencer la conversation
+          </button>
+          <button id="live-end" type="button" class="hidden inline-flex items-center gap-2 px-6 py-3 rounded-full bg-okapi-red hover:brightness-110 text-white font-bold shadow-lg shadow-okapi-red/30 cursor-pointer">
+            <i data-lucide="phone-off" class="w-5 h-5"></i> Terminer
+          </button>
+          <label class="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 cursor-pointer select-none">
+            <input id="live-fr" type="checkbox" class="w-4 h-4 accent-okapi-blue cursor-pointer"> Sous-titres en français
+          </label>
         </div>
+        <p id="live-info" class="mt-4 text-[11px] text-slate-500 dark:text-slate-400 text-center max-w-xl"></p>
+
+        <details class="w-full mt-6 border-t border-slate-200 dark:border-okapi-blue/15 pt-4">
+          <summary class="cursor-pointer text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-okapi-cyan">Historique de la conversation</summary>
+          <div id="live-history" class="mt-3 space-y-2 max-h-72 overflow-y-auto pr-1 text-sm"></div>
+        </details>
       </div>
     </section>
 

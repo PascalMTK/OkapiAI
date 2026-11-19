@@ -50,6 +50,7 @@ class ConverseIn(BaseModel):
     lang: str
     message: str = Field(min_length=1, max_length=1000)
     history: list[ChatTurn] = Field(default_factory=list, max_length=20)
+    voice: bool = False  # voix live : réponses courtes, à l'oral, qui relancent l'échange
 
 
 class ReviewIn(BaseModel):

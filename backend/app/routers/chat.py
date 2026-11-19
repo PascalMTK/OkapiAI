@@ -42,7 +42,9 @@ def tts(text: str = Query(..., min_length=1, max_length=MAX_CHARS), lang: str = 
     path = synthesizer.synthesize(text, lang)
     if path is None:
         raise HTTPException(404, f"Pas de voix disponible pour le {LANGUAGES[lang].lower()}")
-    return FileResponse(path, media_type="audio/wav", headers={"Cache-Control": "public, max-age=86400"})
+    # voix affinée : elle évolue pendant l'entraînement, le navigateur ne doit pas la garder
+    cache = "no-store" if "-remote-" in path.name else "public, max-age=86400"
+    return FileResponse(path, media_type="audio/wav", headers={"Cache-Control": cache})
 
 
 @router.get("/corpus/audio/{rel:path}")
@@ -52,6 +54,30 @@ def corpus_audio(rel: str):
     if path is None:
         raise HTTPException(404, "Enregistrement introuvable")
     return FileResponse(path, media_type="audio/wav", headers={"Cache-Control": "public, max-age=604800"})
+
+
+# Phrase d'ouverture de la voix live : OkapiAI salue et pose une question
+GREETINGS = {
+    "ln": ("Mbote ! Nazali OkapiAI. Ozali malamu ? Olingi tosolola na nini lelo ?",
+           "Bonjour ! Je suis OkapiAI. Tu vas bien ? De quoi veux-tu qu'on parle aujourd'hui ?"),
+    "sw": ("Habari ! Mimi ni OkapiAI. Habari yako ? Ungependa tuzungumze kuhusu nini leo ?",
+           "Bonjour ! Je suis OkapiAI. Comment vas-tu ? De quoi aimerais-tu qu'on parle aujourd'hui ?"),
+}
+RETRY = {  # quand la voix n'a pas été comprise
+    "ln": ("Nayoki yo malamu te. Loba lisusu ?", "Je ne t'ai pas bien entendu. Tu peux répéter ?"),
+    "sw": ("Sikusikia vizuri. Rudia tafadhali ?", "Je ne t'ai pas bien entendu. Tu peux répéter ?"),
+}
+
+
+@router.get("/voice/start")
+def voice_start(lang: str = "auto"):
+    """Début de la voix live : salutation dans la langue + ce que l'on sait faire."""
+    code = lang if lang in GREETINGS else "ln"
+    reply, reply_fr = GREETINGS[code]
+    retry = {c: {"reply": r, "reply_fr": f, "tts_url": tts_url(r, c)} for c, (r, f) in RETRY.items()}
+    return {"lang": code, "reply": reply, "reply_fr": reply_fr, "tts_url": tts_url(reply, code),
+            "retry": retry, "asr": recognizer.supports(code) or (lang == AUTO and bool(recognizer.auto_langs())),
+            "auto_detect": recognizer.auto_langs()}
 
 
 def tts_url(text: str, lang: str):
@@ -125,7 +151,7 @@ def converse(body: ConverseIn, db: Session = Depends(get_db)):
     """Converser en langue nationale : le système répond dans la même langue."""
     _check_conv_lang(body.lang)
     history = [t.model_dump() for t in body.history]
-    return _with_hint(conversation.converse(db, body.lang, body.message, history))
+    return _with_hint(conversation.converse(db, body.lang, body.message, history, voice=body.voice))
 
 
 _history_adapter = TypeAdapter(list[ChatTurn])
@@ -146,6 +172,13 @@ async def voice_converse(
         turns = [t.model_dump() for t in _history_adapter.validate_python(json.loads(history))][-20:]
     except (json.JSONDecodeError, ValidationError):
         raise HTTPException(400, "Historique invalide")
+    out = await _transcribe(audio, lang)
+    if out["transcript"]:
+        out["answer"] = _with_hint(conversation.converse(db, out["lang"], out["transcript"], turns, voice=True))
+    return out
+
+
+async def _transcribe(audio: UploadFile, lang: str) -> dict:
     name = await save_audio(audio)
     if lang == AUTO:
         detected, transcript = recognizer.detect_and_transcribe(AUDIO_DIR / name)
@@ -153,8 +186,14 @@ async def voice_converse(
         asr = bool(recognizer.auto_langs())
     else:
         transcript, asr = recognizer.transcribe(AUDIO_DIR / name, lang), recognizer.supports(lang)
-    out = {"audio_file": name, "transcript": transcript, "lang": lang,
-           "asr_available": asr, "answer": None}
-    if transcript:
-        out["answer"] = _with_hint(conversation.converse(db, lang, transcript, turns))
-    return out
+    return {"audio_file": name, "transcript": transcript, "lang": lang, "asr_available": asr, "answer": None}
+
+
+@router.post("/voice/transcribe")
+async def voice_transcribe(audio: UploadFile = File(...), lang: str = Form(...)):
+    """Voix live, 1re étape : ce que l'utilisateur a dit (et dans quelle langue).
+    La réponse se demande ensuite à /api/converse avec voice=true : l'écran peut montrer
+    la transcription pendant que l'IA réfléchit."""
+    if lang != AUTO:
+        _check_conv_lang(lang)
+    return await _transcribe(audio, lang)

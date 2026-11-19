@@ -23,13 +23,13 @@ const isCongolese = (c) => c && c !== "fr";
 const withToken = (url) => (url && state.token ? `${url}?token=${encodeURIComponent(state.token)}` : url);
 
 // ---------- API ----------
-async function api(path, { method = "GET", json, form } = {}) {
+async function api(path, { method = "GET", json, form, signal } = {}) {
   const headers = {};
   if (state.token) headers.Authorization = `Bearer ${state.token}`;
   let body;
   if (json !== undefined) { headers["Content-Type"] = "application/json"; body = JSON.stringify(json); }
   if (form) body = form;
-  const res = await fetch(path, { method, headers, body });
+  const res = await fetch(path, { method, headers, body, signal });
   const data = res.headers.get("content-type")?.includes("json") ? await res.json() : await res.text();
   if (res.status === 401 && state.token) setSession(null);
   if (!res.ok) {
@@ -157,6 +157,7 @@ function activateTab(tab) {
   $$(".tab-section").forEach((sec) => sec.classList.toggle("hidden", sec.id !== `tab-${tab}`));
   const path = tab === "admin" ? "/admin" : "/";
   if (location.pathname !== path) history.replaceState(null, "", path);
+  if (tab !== "voice") liveStop();  // quitter l'onglet coupe la conversation vocale
   tabLoaders[tab]?.();
 }
 function refreshCurrentTab() {
@@ -210,7 +211,6 @@ function fillLangSelects() {
   $("#learn-lang").innerHTML = options((l) => isCongolese(l.code));
   $("#prop-filter").innerHTML = `<option value="">Toutes</option>` + options((l) => isCongolese(l.code));
   $("#chat-src").value = "ln"; $("#chat-tgt").value = "fr";
-  $("#voice-src").value = "ln"; $("#voice-tgt").value = "fr";
   $("#contrib-form [name=source_lang]").value = "ln";
   $("#contrib-form [name=target_lang]").value = "fr";
 }
@@ -438,184 +438,360 @@ function makeRecorder() {
 }
 const extFor = (blob) => ({ "audio/ogg": "ogg", "audio/mp4": "m4a" }[blob.type] || "webm");
 
-// ---------- Voix live ----------
-const voiceLang = (c) => (c === "auto" ? "Détection automatique" : langName(c));
-const handsFree = () => $("#voice-handsfree")?.checked && modeOf("voice") === "converse";
+// ---------- Voix live : conversation en direct avec OkapiAI ----------
+// L'utilisateur a toujours la priorité : le micro reste ouvert en permanence et, dès qu'il
+// parle, OkapiAI se tait (s'il parlait) ou abandonne sa réponse en cours (s'il réfléchissait)
+// pour l'écouter. Le son est capté en continu : le début de la phrase n'est jamais perdu.
+const LIVE_RATE = 16000;            // ce que la reconnaissance vocale attend
+const LIVE_PREROLL_S = 0.6;         // son gardé avant le début détecté de la parole
+const LIVE_END_SILENCE_MS = 1100;   // fin de phrase
+const live = {
+  on: false, state: "idle", lang: "auto", history: [], start: null,
+  stream: null, ctx: null, mic: null, proc: null, buf: null, noise: 0.01,
+  ring: [], ringLen: 0,             // derniers instants de son (pré-écoute)
+  utter: null, utterLen: 0,         // phrase en cours d'enregistrement
+  carry: null,                      // phrase précédente, si l'utilisateur a complété pendant la réflexion
+  speechMs: 0, quietMs: 0, idleMs: 0, spoke: false, echo: 0, bargeMs: 0,
+  player: null, playAnalyser: null, stopPlayback: null, request: null, raf: null,
+};
+const LIVE_STATUS = {
+  idle: "Appuyez sur « Commencer » pour parler avec OkapiAI",
+  listening: "Je vous écoute…",
+  thinking: "OkapiAI réfléchit… (vous pouvez continuer à parler)",
+  speaking: "OkapiAI parle… parlez quand vous voulez, il s'arrêtera",
+  paused: "En pause — parlez ou touchez l'orbe pour reprendre",
+};
 
-function updateVoiceHint() {
-  const code = $("#voice-src").value;
-  const caps = state.voiceCaps || { asr: [], tts: [], auto_detect: [] };
-  const l = state.langs.find((x) => x.code === code);
-  const hands = handsFree();
-  if (code === "auto" || l?.asr) {
-    $("#voice-hint").textContent = hands
-      ? "Appuyez une fois sur le micro puis parlez naturellement : OkapiAI vous répond à voix haute et réécoute."
-      : "Appuyez sur le micro, parlez, puis appuyez de nouveau : OkapiAI transcrit et vous répond à voix haute.";
-  } else {
-    $("#voice-hint").textContent = `Appuyez sur le micro et parlez. La transcription automatique n'existe pas encore pour le ${l?.name || "cette langue"} : vous taperez ce que vous avez dit.`;
-  }
-  const names = (codes) => codes.map(langName).join(", ") || "aucune";
-  $("#voice-asr-info").textContent = `Reconnaissance vocale : ${names(caps.asr.filter(isCongolese))}. `
-    + `Voix d'OkapiAI : ${names(caps.tts.filter(isCongolese))}.`
-    + (caps.auto_detect.length > 1 ? ` « Détection automatique » reconnaît seule : ${names(caps.auto_detect)}.` : "");
+function liveSetState(s, text) {
+  live.state = s;
+  const orb = $("#live-orb");
+  orb.dataset.state = s;
+  if (s !== "speaking") orb.classList.remove("no-level");
+  if (s !== "listening" && s !== "speaking") orb.style.setProperty("--lvl", 0);
+  $("#live-status").textContent = text || LIVE_STATUS[s];
+  $("#live-dot").classList.toggle("animate-pulse", live.on);
 }
 
-function fillVoiceSrc() {
-  const sel = $("#voice-src");
-  const auto = (state.voiceCaps?.auto_detect || []).length > 1;
-  $('option[value="auto"]', sel)?.remove();
-  if (auto && modeOf("voice") === "converse") {
-    sel.insertAdjacentHTML("afterbegin", `<option value="auto" class="bg-white dark:bg-obsidian-900 text-slate-900 dark:text-white">🌍 Détection automatique</option>`);
-  }
+function liveCaption(user, bot, botFr) {
+  if (user !== undefined) $("#live-user").textContent = user ? (user === "…" ? "…" : `« ${user} »`) : "";
+  if (bot !== undefined) $("#live-bot").textContent = bot || "";
+  if (botFr !== undefined) $("#live-bot-fr").textContent = botFr || "";
+  $("#live-bot-fr").classList.toggle("hidden", !$("#live-fr").checked || !$("#live-bot-fr").textContent);
 }
 
-function setRecVisual(on) {
-  const btn = $("#rec-btn");
-  ["from-sky-400", "via-okapi-blue", "to-blue-700"].forEach((c) => btn.classList.toggle(c, !on));
-  ["from-okapi-red", "to-rose-700"].forEach((c) => btn.classList.toggle(c, on));
-  $("#rec-label").textContent = on ? "Stop" : "Parler";
-  $("#mic-ring-1").classList.toggle("hidden", !on);
-  $("#mic-ring-2").classList.toggle("hidden", !on);
+function liveLog(who, text, fr, lang, note) {
+  if (!text) return;
+  const row = document.createElement("div");
+  row.className = who === "user" ? "text-right" : "";
+  row.innerHTML = `<span class="inline-block max-w-[85%] px-3 py-2 rounded-xl ${who === "user"
+      ? "bg-gradient-to-br from-okapi-blue to-blue-700 text-white"
+      : "bg-slate-100 dark:bg-obsidian-800 text-slate-800 dark:text-slate-100"}">${esc(text)}
+    ${fr ? `<span class="block text-[11px] opacity-70 italic mt-0.5">${esc(fr)}</span>` : ""}
+    ${lang || note ? `<span class="block text-[10px] opacity-60 mt-0.5">${esc([lang && langName(lang), note].filter(Boolean).join(" · "))}</span>` : ""}</span>`;
+  $("#live-history").appendChild(row);
+  $("#live-history").scrollTop = $("#live-history").scrollHeight;
 }
 
-function initVoice() {
-  const rec = makeRecorder();
-  const log = $("#voice-log");
-  let session = false;  // mode mains libres : la conversation continue jusqu'à « Stop »
-  const ensureVoiceLang = () => {
-    const sel = $("#voice-src");
-    if (modeOf("voice") === "converse" && sel.value !== "auto") ensureCongolese(sel);
-  };
-  fillVoiceSrc();
-  if ($('#voice-src option[value="auto"]')) $("#voice-src").value = "auto";
-  $("#voice-src").addEventListener("change", () => { convHistory.voice = []; ensureVoiceLang(); updateVoiceHint(); });
-  $("#voice-handsfree").addEventListener("change", updateVoiceHint);
-  $('[data-modes="voice"]').addEventListener("modechange", () => {
-    const keep = $("#voice-src").value;
-    fillVoiceSrc();
-    $("#voice-src").value = $(`#voice-src option[value="${keep}"]`) ? keep : "ln";
-    ensureVoiceLang();
-    updateVoiceHint();
-  });
-
-  const setHint = (t) => ($("#voice-hint").textContent = t);
-
-  async function listen() {
-    stopSpeaking();
-    try {
-      await rec.start(handsFree() ? (spoke) => (spoke ? finish() : endSession("Je n'ai rien entendu. Appuyez sur le micro pour reprendre.")) : undefined);
-    } catch { session = false; return showToast("Micro inaccessible : autorisez l'accès au micro dans le navigateur.", "error"); }
-    setRecVisual(true);
-    setHint(handsFree() ? "🎙️ Je vous écoute… parlez, je réponds dès que vous vous arrêtez." : "Écoute en cours… appuyez de nouveau pour terminer.");
+// ---- Son : capture continue, ré-échantillonnée à 16 kHz ----
+function liveRms(x) {
+  let s = 0;
+  for (let i = 0; i < x.length; i++) s += x[i] * x[i];
+  return Math.sqrt(s / Math.max(1, x.length));
+}
+function liveResample(x, from) {
+  if (from === LIVE_RATE) return Float32Array.from(x);
+  const ratio = from / LIVE_RATE, n = Math.floor(x.length / ratio), out = new Float32Array(n);
+  for (let i = 0; i < n; i++) {            // moyenne sur la fenêtre : filtre anti-repliement simple
+    const a = Math.floor(i * ratio), b = Math.min(x.length, Math.floor((i + 1) * ratio));
+    let s = 0;
+    for (let j = a; j < b; j++) s += x[j];
+    out[i] = s / Math.max(1, b - a);
   }
+  return out;
+}
+function liveConcat(chunks, len) {
+  const out = new Float32Array(len);
+  let o = 0;
+  for (const c of chunks) { out.set(c, o); o += c.length; }
+  return out;
+}
+function liveWav(samples) {
+  const buf = new ArrayBuffer(44 + samples.length * 2), v = new DataView(buf);
+  const w = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  w(0, "RIFF"); v.setUint32(4, 36 + samples.length * 2, true); w(8, "WAVE"); w(12, "fmt ");
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, LIVE_RATE, true); v.setUint32(28, LIVE_RATE * 2, true); v.setUint16(32, 2, true);
+  v.setUint16(34, 16, true); w(36, "data"); v.setUint32(40, samples.length * 2, true);
+  for (let i = 0; i < samples.length; i++) v.setInt16(44 + i * 2, Math.max(-1, Math.min(1, samples[i])) * 32767, true);
+  return new Blob([buf], { type: "audio/wav" });
+}
 
-  function endSession(message) {
-    session = false;
-    stopSpeaking();
-    rec.stop();
-    setRecVisual(false);
-    updateVoiceHint();
-    if (message) setHint(message);
+function liveStartUtterance(withPreroll) {
+  const pre = withPreroll ? live.ring.slice() : [];
+  live.utter = pre;
+  live.utterLen = pre.reduce((n, c) => n + c.length, 0);
+  live.speechMs = 0; live.quietMs = 0; live.idleMs = 0;
+  live.spoke = withPreroll;
+}
+
+// Appelé ~20 fois par seconde avec le son du micro : c'est ici que l'utilisateur prend la main
+function liveOnAudio(raw, ms) {
+  const chunk = liveResample(raw, live.ctx.sampleRate);
+  live.ring.push(chunk); live.ringLen += chunk.length;
+  while (live.ringLen - live.ring[0].length > LIVE_PREROLL_S * LIVE_RATE) live.ringLen -= live.ring.shift().length;
+  if (!live.on) return;
+  const level = liveRms(raw);
+
+  if (live.state === "speaking" || live.state === "thinking") {
+    // La voix d'OkapiAI revient un peu dans le micro (écho) : on apprend son niveau pour
+    // ne réagir qu'à une vraie voix, plus forte que cet écho.
+    const threshold = Math.max(0.03, live.noise * 3, live.echo * 2.5);
+    if (level > threshold) live.bargeMs += ms;
+    else { live.bargeMs = 0; live.echo = live.echo * 0.97 + level * 0.03; }
+    if (live.bargeMs >= 200) liveBargeIn();
+    return;
   }
-
-  async function finish() {
-    setRecVisual(false);
-    const blob = await rec.stop();
-    if (!blob) return;
-    setHint("⏳ OkapiAI réfléchit…");
-    const src = $("#voice-src").value, tgt = $("#voice-tgt").value;
-    const me = appendUser(log, `<audio controls src="${URL.createObjectURL(blob)}" class="h-8 max-w-[240px]"></audio>`, "Transcription…");
-    const form = new FormData();
-    form.append("audio", blob, `voix.${extFor(blob)}`);
-    let spoken = Promise.resolve(), understood = true;
-    try {
-      if (modeOf("voice") === "converse") {
-        form.append("lang", src);
-        form.append("history", JSON.stringify(convHistory.voice));
-        const r = await api("/api/voice/converse", { method: "POST", form });
-        understood = Boolean(r.transcript);
-        spoken = renderVoiceConverse(me, r, src);
-      } else {
-        form.append("source_lang", src); form.append("target_lang", tgt);
-        spoken = renderVoiceTranslate(me, await api("/api/voice/chat", { method: "POST", form }), src, tgt);
-      }
-    } catch (err) { $(".u-meta", me).textContent = `⚠️ ${err.message}`; understood = false; }
-    setHint("🔊 OkapiAI vous répond…");
-    await spoken;
-    // Mains libres : on réécoute automatiquement après la réponse parlée
-    if (session && handsFree() && understood) return listen();
-    endSession(session && !understood ? "Je n'ai pas compris. Appuyez sur le micro pour réessayer, ou corrigez le texte." : "");
+  if (live.state === "paused") {
+    if (level > Math.max(0.02, live.noise * 2.5)) { live.speechMs += ms; if (live.speechMs > 150) liveListen(true); }
+    else live.speechMs = 0;
+    return;
   }
+  if (live.state !== "listening" || !live.utter) return;
 
-  $("#rec-btn").addEventListener("click", async () => {
-    if (session || rec.active) {
-      if (handsFree()) return endSession("Conversation terminée. Appuyez sur le micro pour recommencer.");
-      session = false;
-      return finish();
+  live.utter.push(chunk); live.utterLen += chunk.length;
+  const loud = level > Math.max(0.015, live.noise * 2.5);
+  if (loud) { live.speechMs += ms; live.quietMs = 0; if (live.speechMs > 150) live.spoke = true; }
+  else if (live.spoke) live.quietMs += ms;
+  else live.idleMs += ms;
+  if (live.spoke && live.quietMs > LIVE_END_SILENCE_MS) return liveEndUtterance();
+  if (live.spoke && live.utterLen > 25 * LIVE_RATE) return liveEndUtterance();   // phrase très longue
+  if (!live.spoke && live.idleMs > 15000) { live.utter = null; liveSetState("paused"); }
+}
+
+// L'utilisateur parle : OkapiAI lui laisse immédiatement la parole
+function liveBargeIn() {
+  const was = live.state;
+  live.bargeMs = 0;
+  if (was === "speaking") live.stopPlayback?.({ interrupted: true });
+  if (was === "thinking") {
+    live.request?.abort();                 // la réponse en préparation est abandonnée…
+    live.request = null;                   // …et ce que l'utilisateur ajoute complète sa phrase
+  }
+  liveListen(true);
+}
+
+function liveListen(fromSpeech = false) {
+  if (!live.on) return;
+  liveStartUtterance(fromSpeech);
+  liveSetState("listening");
+}
+
+function liveEndUtterance() {
+  let pcm = liveConcat(live.utter, live.utterLen);
+  live.utter = null;
+  if (live.carry) {                        // phrase précédente + complément, avec une petite pause
+    const gap = new Float32Array(Math.round(0.3 * LIVE_RATE));
+    pcm = liveConcat([live.carry, gap, pcm], live.carry.length + gap.length + pcm.length);
+  }
+  live.carry = pcm;                        // gardée tant que la réponse n'est pas arrivée
+  liveSend(pcm);
+}
+
+async function liveSend(pcm) {
+  if (!live.on) return;
+  const ctrl = new AbortController();
+  live.request = ctrl;
+  liveSetState("thinking", "Je transcris ce que vous avez dit…");
+  liveCaption("…", "", "");
+  live.echo = 0; live.bargeMs = 0;
+  const form = new FormData();
+  form.append("audio", liveWav(pcm), "voix.wav");
+  form.append("lang", live.lang);
+  let r, a;
+  try {
+    r = await api("/api/voice/transcribe", { method: "POST", form, signal: ctrl.signal });
+    if (live.request !== ctrl) return;
+    const lang = r.lang || "ln";
+    if (!r.transcript) {                   // rien compris : OkapiAI demande de répéter, dans la langue
+      live.carry = null; live.request = null;
+      const retry = live.start?.retry?.[lang] || live.start?.retry?.ln;
+      liveCaption("", retry?.reply, retry?.reply_fr);
+      if (await liveSpeak(retry?.reply, lang, retry?.tts_url)) return;
+      return liveListen();
     }
-    session = true;
-    listen();
+    liveCaption(r.transcript, "", "");
+    liveSetState("thinking", "OkapiAI réfléchit… (vous pouvez continuer à parler)");
+    a = await api("/api/converse", { method: "POST", signal: ctrl.signal,
+      json: { lang, message: r.transcript.slice(0, 1000), history: live.history.slice(-20), voice: true } });
+    if (live.request !== ctrl) return;
+    live.request = null; live.carry = null;   // réponse reçue : la phrase est close
+    liveLog("user", r.transcript, null, live.lang === "auto" ? lang : null);
+    if (!a?.reply) {
+      liveCaption(r.transcript, a?.hint || "Je ne sais pas encore répondre à ça.", "");
+      liveLog("bot", a?.hint || "Je ne sais pas encore répondre.");
+      return liveListen();
+    }
+    live.history.push({ role: "user", text: r.transcript }, { role: "assistant", text: a.reply });
+    liveCaption(r.transcript, a.reply, a.reply_fr);
+    const interrupted = await liveSpeak(a.reply, lang, a.audio_url || a.tts_url);
+    liveLog("bot", a.reply, a.reply_fr, null, interrupted ? "interrompu" : null);
+    if (!interrupted) liveListen();
+  } catch (err) {
+    if (err.name === "AbortError" || live.request !== ctrl) return;   // l'utilisateur a repris la parole
+    live.request = null; live.carry = null;
+    if (live.on) liveSetState("paused", `⚠️ ${err.message} — parlez ou touchez l'orbe pour réessayer`);
+  }
+}
+
+// OkapiAI parle. Résout `true` si l'utilisateur l'a interrompu, `false` à la fin normale.
+function liveSpeak(text, lang, url) {
+  if (!live.on || !text) return Promise.resolve(false);
+  liveSetState("speaking");
+  live.echo = 0; live.bargeMs = 0;
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (how) => {
+      if (done) return;
+      done = true;
+      live.player?.pause();
+      live.player = null;
+      if ("speechSynthesis" in window) speechSynthesis.cancel();
+      live.stopPlayback = null;
+      resolve(Boolean(how?.interrupted));
+    };
+    live.stopPlayback = finish;
+    if (url) {
+      const a = new Audio(url);
+      live.player = a;
+      try { live.ctx.createMediaElementSource(a).connect(live.playAnalyser); }
+      catch { $("#live-orb").classList.add("no-level"); }
+      a.onended = a.onerror = () => finish();
+      a.play().catch(() => finish());
+    } else if ("speechSynthesis" in window && ["fr", "sw"].includes(lang)) {
+      $("#live-orb").classList.add("no-level");
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = lang === "fr" ? "fr-FR" : "sw-KE";
+      u.onend = u.onerror = () => finish();
+      speechSynthesis.speak(u);
+    } else {
+      setTimeout(() => finish(), Math.min(6000, 400 + text.length * 55));  // pas de voix : temps de lecture
+    }
   });
 }
 
-const voiceInput = (cls, placeholder, value) =>
-  `<input class="${cls} mt-2 w-full rounded-lg px-3 py-1.5 text-sm bg-white/15 border border-white/30 text-white placeholder-white/70 focus:outline-none focus:border-okapi-yellow" placeholder="${esc(placeholder)}" value="${esc(value || "")}">`;
-const voiceBtn = (cls, label) =>
-  `<button type="button" class="${cls} px-3 py-1 rounded-lg bg-white/15 hover:bg-white/25 border border-white/30 text-xs font-bold cursor-pointer">${label}</button>`;
-
-function renderVoiceConverse(me, r, selected) {
-  const lang = r.lang || selected;  // langue détectée en mode automatique
-  $(".u-meta", me).textContent = selected === "auto" ? `${langName(lang)} (détecté)` : langName(lang);
-  const box = document.createElement("form");
-  box.innerHTML = voiceInput("vt-src", `Ce que vous avez dit (${langName(lang)})`, r.transcript) +
-    `<div class="mt-2 flex gap-2">${voiceBtn("vt-send", r.answer ? "Renvoyer corrigé" : "Envoyer")}</div>`;
-  $(".u-body", me).appendChild(box);
-  const send = () => { const t = $(".vt-src", box).value.trim(); if (t) sendConverse($("#voice-log"), lang, t, "voice"); };
-  $(".vt-send", box).onclick = send;
-  box.onsubmit = (e) => { e.preventDefault(); send(); };
-  if (r.answer) return renderAnswer($("#voice-log"), lang, r.transcript, r.answer, "voice");
-  $(".vt-src", box).focus();
-  return Promise.resolve();
+// ---- Orbe animé ----
+function liveAnimate() {
+  const orb = $("#live-orb");
+  let lvl = 0;
+  const level = (an) => { an.getFloatTimeDomainData(live.buf); return liveRms(live.buf); };
+  if (live.state === "listening" && live.mic) lvl = Math.min(1, level(live.mic) * 9);
+  if (live.state === "speaking" && live.playAnalyser && live.player) lvl = Math.min(1, level(live.playAnalyser) * 6);
+  orb.style.setProperty("--lvl", lvl.toFixed(3));
+  live.raf = requestAnimationFrame(liveAnimate);
 }
 
-function renderVoiceTranslate(me, r, src, tgt) {
-  $(".u-meta", me).textContent = `${langName(src)} → ${langName(tgt)}`;
-  const box = document.createElement("div");
-  box.innerHTML = voiceInput("vt-src", `Ce que vous avez dit (${langName(src)})`, r.transcript) +
-    voiceInput("vt-tgt", `Traduction (${langName(tgt)})`, r.translation?.translation) +
-    `<div class="mt-2 flex flex-wrap gap-2">${voiceBtn("vt-translate", "Traduire")}${voiceBtn("vt-save", "💾 Ajouter au dataset")}</div>
-     <p class="vt-msg mt-1 text-[11px] text-okapi-yellow font-semibold"></p>`;
-  $(".u-body", me).appendChild(box);
-  const log = $("#voice-log");
-  let spoken = Promise.resolve();
-  if (r.translation?.translation) {
-    appendBot(log, `<p class="text-base font-semibold">${esc(r.translation.translation)}</p>${audioTag(r.translation.audio_url)}`, translationMeta(r.translation));
-    spoken = r.translation.audio_url ? playUrl(r.translation.audio_url)
-      : speak(r.translation.translation, tgt, ttsFor(r.translation.translation, tgt));
+async function liveOpenMic() {
+  live.stream = await navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+  live.ctx = new AudioContext();
+  const src = live.ctx.createMediaStreamSource(live.stream);
+  live.mic = live.ctx.createAnalyser();
+  live.mic.fftSize = 1024;
+  live.buf = new Float32Array(live.mic.fftSize);
+  src.connect(live.mic);
+  live.playAnalyser = live.ctx.createAnalyser();
+  live.playAnalyser.fftSize = 1024;
+  live.playAnalyser.connect(live.ctx.destination);
+  // capture continue du micro (le nœud doit être relié à la sortie pour fonctionner, à volume nul)
+  live.proc = live.ctx.createScriptProcessor(2048, 1, 1);
+  const mute = live.ctx.createGain();
+  mute.gain.value = 0;
+  src.connect(live.proc); live.proc.connect(mute); mute.connect(live.ctx.destination);
+  const ms = (2048 / live.ctx.sampleRate) * 1000;
+  live.ring = []; live.ringLen = 0;
+  live.proc.onaudioprocess = (e) => liveOnAudio(e.inputBuffer.getChannelData(0), ms);
+  // bruit de fond : mesuré pendant 0,5 s
+  const t0 = performance.now();
+  live.noise = 0.004;
+  while (performance.now() - t0 < 500) {
+    live.mic.getFloatTimeDomainData(live.buf);
+    live.noise = Math.max(live.noise, liveRms(live.buf));
+    await new Promise((r) => setTimeout(r, 40));
   }
-  $(".vt-translate", box).onclick = async () => {
-    const text = $(".vt-src", box).value.trim();
-    if (!text) return;
-    try {
-      const t = await api("/api/chat", { method: "POST", json: { text, source_lang: src, target_lang: tgt } });
-      if (t.translation) $(".vt-tgt", box).value = t.translation;
-      appendBot(log, `<p>${esc(t.reply)}</p>${audioTag(t.audio_url)}`, translationMeta(t));
-    } catch (err) { showToast(err.message, "error"); }
-  };
-  $(".vt-save", box).onclick = async () => {
-    if (!requireLogin()) return;
-    const form = new FormData();
-    form.append("audio_file", r.audio_file);
-    form.append("source_lang", src); form.append("source_text", $(".vt-src", box).value.trim());
-    form.append("target_lang", tgt); form.append("target_text", $(".vt-tgt", box).value.trim());
-    try {
-      const res = await api("/api/contributions/voice", { method: "POST", form });
-      $(".vt-msg", box).textContent = `✓ ${res.message}`;
-      $(".vt-save", box).disabled = true;
-      showToast("Votre voix a été ajoutée au dataset de collecte.", "success");
-    } catch (err) { $(".vt-msg", box).textContent = `⚠️ ${err.message}`; }
-  };
-  return spoken;
+}
+
+function liveCloseMic() {
+  cancelAnimationFrame(live.raf); live.raf = null;
+  if (live.proc) live.proc.onaudioprocess = null;
+  live.stream?.getTracks().forEach((t) => t.stop());
+  live.ctx?.close();
+  Object.assign(live, { stream: null, ctx: null, mic: null, proc: null, playAnalyser: null, utter: null, ring: [], ringLen: 0 });
+}
+
+async function liveBegin() {
+  stopSpeaking();
+  live.lang = $("#live-lang").value;
+  live.history = []; live.carry = null; live.request = null;
+  $("#live-history").innerHTML = "";
+  try { await liveOpenMic(); }
+  catch { return showToast("Micro inaccessible : autorisez l'accès au micro dans le navigateur.", "error"); }
+  live.on = true;
+  $("#live-start").classList.add("hidden");
+  $("#live-end").classList.remove("hidden");
+  $("#live-lang").disabled = true;
+  liveAnimate();
+  try { live.start = await api(`/api/voice/start?lang=${encodeURIComponent(live.lang)}`); }
+  catch { live.start = null; }
+  if (!live.on) return;
+  if (live.start?.reply) {
+    live.history.push({ role: "assistant", text: live.start.reply });
+    liveCaption("", live.start.reply, live.start.reply_fr);
+    liveLog("bot", live.start.reply, live.start.reply_fr);
+    if (await liveSpeak(live.start.reply, live.start.lang, live.start.tts_url)) return;  // interrompu : déjà à l'écoute
+  }
+  liveListen();
+}
+
+function liveStop() {
+  if (!live.on && !live.stream) return;
+  live.on = false;
+  live.request?.abort(); live.request = null; live.carry = null;
+  live.stopPlayback?.();
+  liveCloseMic();
+  $("#live-start").classList.remove("hidden");
+  $("#live-end").classList.add("hidden");
+  $("#live-lang").disabled = false;
+  liveSetState("idle", "Conversation terminée. Appuyez sur « Commencer » pour en démarrer une autre.");
+}
+
+function liveFillLangs() {
+  const caps = state.voiceCaps || { asr: [], tts: [], auto_detect: [] };
+  const opts = [];
+  if ((caps.auto_detect || []).length > 1) opts.push(["auto", "🌍 Détection automatique"]);
+  for (const l of state.langs.filter((x) => isCongolese(x.code) && caps.asr.includes(x.code))) opts.push([l.code, l.name]);
+  $("#live-lang").innerHTML = opts.map(([v, n]) =>
+    `<option value="${v}" class="bg-white dark:bg-obsidian-900 text-slate-900 dark:text-white">${esc(n)}</option>`).join("");
+  const names = (codes) => codes.filter(isCongolese).map(langName).join(", ") || "aucune";
+  $("#live-info").textContent = opts.length
+    ? `Reconnaissance vocale : ${names(caps.asr)} · Voix d'OkapiAI : ${names(caps.tts)}. `
+      + "Le kikongo et le tshiluba n'ont pas encore de modèle vocal : utilisez le chat écrit."
+    : "La reconnaissance vocale n'est pas disponible sur ce serveur : utilisez le chat écrit.";
+  $("#live-start").disabled = !opts.length;
+  $("#live-start").classList.toggle("opacity-50", !opts.length);
+}
+
+function initLive() {
+  liveFillLangs();
+  $("#live-start").addEventListener("click", liveBegin);
+  $("#live-end").addEventListener("click", liveStop);
+  $("#live-fr").addEventListener("change", () => liveCaption(undefined, undefined, $("#live-bot-fr").textContent));
+  $("#live-orb").addEventListener("click", () => {
+    if (!live.on) return liveBegin();
+    if (live.state === "speaking" || live.state === "thinking") return liveBargeIn();  // « laisse-moi parler »
+    if (live.state === "paused") return liveListen();
+    if (live.state === "listening" && live.spoke) return liveEndUtterance();          // « j'ai fini »
+  });
+  document.addEventListener("visibilitychange", () => { if (document.hidden) liveStop(); });
 }
 
 // ---------- Contribuer ----------
@@ -957,11 +1133,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   fillLangSelects();
   initModes();
   initChat();
-  initVoice();
+  initLive();
   initContribute();
   initLearn();
   initAdmin();
-  updateVoiceHint();
   icons();
 
   api("/api/features").then((f) => {
