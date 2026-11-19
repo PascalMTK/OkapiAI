@@ -32,6 +32,8 @@ Règles :
 - Les exemples validés par la communauté (fournis avec chaque message) sont la référence : réutilise leur vocabulaire, leur orthographe et leurs tournures quand c'est pertinent.
 - Si tu n'es pas sûr d'un mot, choisis une formulation plus simple que tu maîtrises plutôt que d'inventer un mot.
 - Sois chaleureux et respectueux, comme dans une conversation entre Congolais.
+- Fais vivre la conversation : quand c'est naturel, termine par une courte question pour que l'utilisateur continue à parler dans la langue.
+- Si l'utilisateur demande le sens d'un mot, explique-le dans la langue de la conversation (le sens peut être cité en français), en t'appuyant d'abord sur les entrées du dictionnaire fournies avec les exemples. Si le mot n'y figure pas et que tu n'es pas sûr, dis-le plutôt que d'inventer.
 - Fournis aussi une traduction française fidèle de ta réponse, pour les personnes qui apprennent la langue."""
 
 OUTPUT_SCHEMA = {

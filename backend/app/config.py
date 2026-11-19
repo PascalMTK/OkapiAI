@@ -5,6 +5,8 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent          # backend/
 ROOT_DIR = BASE_DIR.parent                                  # racine du projet
 FRONTEND_DIR = ROOT_DIR / "frontend"
+# Corpus lingala (dictionnaires Wiktionnaire / Wikipédia) utilisé pour expliquer les mots
+DATASET_DIR = Path(os.getenv("OKAPI_DATASET_DIR", ROOT_DIR / "dataset"))
 
 DATA_DIR = Path(os.getenv("OKAPI_DATA_DIR", BASE_DIR / "data"))
 AUDIO_DIR = DATA_DIR / "audio"

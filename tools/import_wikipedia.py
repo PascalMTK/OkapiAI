@@ -2,7 +2,7 @@
 
 Usage: python tools/import_wikipedia.py
 
-Inputs (downloaded from the Wikipedia API into dataset/knowledge/):
+Inputs (downloaded from the Wikipedia API into dataset/raw/wikipedia/):
   wiki_lingala_raw.json   plain-text extract
   wiki_lingala_html.json  parsed HTML (for the tables)
 Outputs (dataset/knowledge/):
@@ -19,7 +19,9 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-KB = Path(__file__).resolve().parent.parent / "dataset" / "knowledge"
+DATASET = Path(__file__).resolve().parent.parent / "dataset"
+KB = DATASET / "knowledge"
+RAW = DATASET / "raw" / "wikipedia"
 SOURCE = {"source": "https://fr.wikipedia.org/wiki/Lingala", "licence": "CC BY-SA 4.0"}
 
 
@@ -30,7 +32,7 @@ def cell(c) -> str:
 
 
 def sections():
-    text = json.loads((KB / "wiki_lingala_raw.json").read_text(encoding="utf-8"))["query"]["pages"][0]["extract"]
+    text = json.loads((RAW / "wiki_lingala_raw.json").read_text(encoding="utf-8"))["query"]["pages"][0]["extract"]
     skip = {"Notes et références", "Voir aussi", "Bibliographie", "Articles connexes", "Liens externes"}
     path, out = [], []
     for block in re.split(r"^(=+ .* =+)$", text, flags=re.M):
@@ -47,7 +49,7 @@ def sections():
 
 
 def tables():
-    html = json.loads((KB / "wiki_lingala_html.json").read_text(encoding="utf-8"))["parse"]["text"]
+    html = json.loads((RAW / "wiki_lingala_html.json").read_text(encoding="utf-8"))["parse"]["text"]
     soup = BeautifulSoup(html, "html.parser")
     lex, gram = [], []
     for t in soup.select("table.wikitable"):

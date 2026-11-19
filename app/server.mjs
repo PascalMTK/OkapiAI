@@ -62,7 +62,7 @@ for (const entry of readdirSync(join(dataset, 'clips'), { withFileTypes: true })
   const file = join(dataset, 'clips', entry.name, 'metadata.jsonl');
   if (existsSync(file)) ingest(file, 'Extrait de cours');
 }
-for (const row of rows(join(root, 'kaikki.org-dictionary-Lingala.jsonl'))) {
+for (const row of rows(join(dataset, 'sources', 'kaikki', 'kaikki.org-dictionary-Lingala.jsonl'))) {
   const glosses = row.senses?.flatMap(sense => sense.glosses || []) || [];
   if (row.word && glosses.length) add([row.word, ...glosses].join(' — '), 'Wiktionnaire · Kaikki', undefined, [row.word, ...glosses], row.word);
 }

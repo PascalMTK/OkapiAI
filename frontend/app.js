@@ -250,11 +250,37 @@ const audioTag = (url) => (url ? `<audio controls preload="none" src="${esc(url)
 const smallBtn = "inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-okapi-blue/15 dark:hover:bg-okapi-blue/25 text-blue-800 dark:text-okapi-cyan border border-blue-200 dark:border-okapi-blue/30 text-xs font-bold transition-colors cursor-pointer";
 const inputCls = "w-full bg-slate-50 dark:bg-obsidian-950 border border-slate-300 dark:border-okapi-blue/25 focus:border-okapi-blue rounded-lg px-3 py-1.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none";
 
-function speak(text, lang) {
-  if (!("speechSynthesis" in window) || !["fr", "sw"].includes(lang)) return;
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = lang === "fr" ? "fr-FR" : "sw-KE";
-  speechSynthesis.speak(u);
+// Fait parler OkapiAI. Priorité : enregistrement validé > voix OkapiAI (serveur, langues
+// nationales) > voix du navigateur (français / swahili). Résout quand la lecture est finie.
+let currentAudio = null;
+function stopSpeaking() {
+  currentAudio?.pause();
+  currentAudio = null;
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
+}
+function playUrl(url) {
+  return new Promise((resolve) => {
+    stopSpeaking();
+    const a = new Audio(url);
+    currentAudio = a;
+    a.onended = a.onerror = () => resolve();
+    a.play().catch(() => resolve());
+  });
+}
+// URL de la voix OkapiAI pour une phrase, si le serveur a une voix dans cette langue
+const ttsFor = (text, lang) => (text && state.voiceCaps?.tts?.includes(lang)
+  ? `/api/tts?lang=${encodeURIComponent(lang)}&text=${encodeURIComponent(text.slice(0, 600))}` : null);
+
+function speak(text, lang, ttsUrl) {
+  if (ttsUrl) return playUrl(ttsUrl);
+  return new Promise((resolve) => {
+    if (!text || !("speechSynthesis" in window) || !["fr", "sw"].includes(lang)) return resolve();
+    stopSpeaking();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = lang === "fr" ? "fr-FR" : "sw-KE";
+    u.onend = u.onerror = () => resolve();
+    speechSynthesis.speak(u);
+  });
 }
 
 // Réponse de traduction
@@ -267,20 +293,29 @@ function translationMeta(r) {
 const convHistory = { chat: [], voice: [] };
 
 function renderAnswer(log, lang, userMsg, a, key) {
-  const meta = { dataset: "Réponse validée par la communauté", ia: "Réponse IA — peut contenir des erreurs" }[a.method] || "";
+  const meta = {
+    dataset: "Réponse validée par la communauté",
+    ia: "Réponse IA — peut contenir des erreurs",
+    lexique: "Dictionnaire (Wiktionnaire · Wikipédia)",
+    base: "Phrase de base — corrigez-la si besoin",
+    inconnu: "Mot inconnu — apprenez-le au bot",
+  }[a.method] || "";
   const html = a.reply
     ? `<p class="text-base font-semibold">${esc(a.reply)}</p>
        ${a.reply_fr ? `<details class="mt-1 text-xs text-slate-500 dark:text-slate-400"><summary class="cursor-pointer text-blue-700 dark:text-okapi-cyan font-semibold">🇫🇷 En français</summary><p class="mt-1 italic">${esc(a.reply_fr)}</p></details>` : ""}
        ${audioTag(a.audio_url)}`
     : `<p>🤔 ${esc(a.hint || "Je ne sais pas encore répondre.")}</p>`;
-  const body = appendBot(log, html + `<div class="mt-2.5 flex flex-wrap gap-2"><button type="button" class="b-teach ${smallBtn}">
+  const listen = a.reply && (a.tts_url || a.audio_url)
+    ? `<button type="button" class="b-listen ${smallBtn}"><i data-lucide="volume-2" class="w-3.5 h-3.5"></i>Écouter</button>` : "";
+  const body = appendBot(log, html + `<div class="mt-2.5 flex flex-wrap gap-2">${listen}<button type="button" class="b-teach ${smallBtn}">
       <i data-lucide="${a.reply ? "pencil" : "graduation-cap"}" class="w-3.5 h-3.5"></i>${a.reply ? "Corriger" : "Apprendre une réponse"}</button></div>`, meta);
   $(".b-teach", body).onclick = () => showTeach(body, lang, userMsg, a.reply);
-  if (a.reply) {
-    convHistory[key].push({ role: "user", text: userMsg }, { role: "assistant", text: a.reply });
-    convHistory[key] = convHistory[key].slice(-20);
-    if (!a.audio_url) speak(a.reply, lang);
-  }
+  const say = () => (a.audio_url ? playUrl(a.audio_url) : speak(a.reply, lang, a.tts_url));
+  if ($(".b-listen", body)) $(".b-listen", body).onclick = say;
+  if (!a.reply) return Promise.resolve();
+  convHistory[key].push({ role: "user", text: userMsg }, { role: "assistant", text: a.reply });
+  convHistory[key] = convHistory[key].slice(-20);
+  return say();  // OkapiAI répond à voix haute
 }
 
 function showTeach(body, lang, msg, current) {
@@ -308,7 +343,7 @@ function showTeach(body, lang, msg, current) {
 async function sendConverse(log, lang, text, key) {
   try {
     const a = await api("/api/converse", { method: "POST", json: { lang, message: text, history: convHistory[key] } });
-    renderAnswer(log, lang, text, a, key);
+    return renderAnswer(log, lang, text, a, key);
   } catch (err) { appendBot(log, `<p>⚠️ ${esc(err.message)}</p>`); }
 }
 
@@ -325,7 +360,8 @@ function initChat() {
   const onChatMode = (mode) => {
     if (mode === "converse") ensureCongolese(src);
     input.placeholder = mode === "converse"
-      ? "Écrivez en lingala, swahili, kikongo ou tshiluba…" : "Écrivez le mot ou la phrase à traduire…";
+      ? "Écrivez en lingala, swahili, kikongo ou tshiluba… ou demandez « que veut dire ndako ? »"
+      : "Écrivez le mot ou la phrase à traduire…";
   };
   $('[data-modes="chat"]').addEventListener("modechange", (e) => onChatMode(e.detail));
   onChatMode(modeOf("chat"));  // état initial (le mode est appliqué avant cet écouteur)
@@ -341,26 +377,51 @@ function initChat() {
     try {
       const r = await api("/api/chat", { method: "POST", json: { text, source_lang: src.value, target_lang: tgt.value } });
       appendBot(log, `<p>${esc(r.reply)}</p>${audioTag(r.audio_url)}`, translationMeta(r));
-      if (r.translation) speak(r.translation, r.target_lang);
+      if (r.translation) speak(r.translation, r.target_lang, r.audio_url ? null : ttsFor(r.translation, r.target_lang));
     } catch (err) { appendBot(log, `<p>⚠️ ${esc(err.message)}</p>`); }
   });
 }
 
 // ---------- Enregistreur audio ----------
+// Enregistreur micro. `onSilence` (optionnel) : appelé quand l'utilisateur a parlé puis
+// s'est tu ~1,2 s (détection de fin de phrase pour le mode mains libres), ou après 20 s.
 function makeRecorder() {
-  let rec, chunks = [], stream;
+  let rec, chunks = [], stream, ctx, timer;
   return {
     get active() { return rec?.state === "recording"; },
-    async start() {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    async start(onSilence) {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
       const type = ["audio/webm", "audio/ogg", "audio/mp4"].find((t) => MediaRecorder.isTypeSupported?.(t));
       rec = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
       chunks = [];
       rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
       rec.start();
+      if (!onSilence) return;
+      ctx = new AudioContext();
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      ctx.createMediaStreamSource(stream).connect(analyser);
+      const buf = new Float32Array(analyser.fftSize);
+      const t0 = performance.now();
+      let spoke = false, quietSince = null, noise = 0.01;
+      timer = setInterval(() => {
+        analyser.getFloatTimeDomainData(buf);
+        const rms = Math.sqrt(buf.reduce((s, v) => s + v * v, 0) / buf.length);
+        const now = performance.now();
+        if (now - t0 < 400) { noise = Math.max(noise, rms); return; }  // bruit de fond
+        if (rms > Math.max(0.02, noise * 2.5)) { spoke = true; quietSince = null; }
+        else if (spoke) quietSince ??= now;
+        if ((spoke && quietSince && now - quietSince > 1200) || now - t0 > 20000) {
+          clearInterval(timer); timer = null;
+          onSilence(spoke);
+        }
+      }, 80);
     },
     stop() {
+      clearInterval(timer); timer = null;
+      ctx?.close(); ctx = null;
       return new Promise((resolve) => {
+        if (!rec || rec.state !== "recording") return resolve(null);
         rec.onstop = () => {
           stream.getTracks().forEach((t) => t.stop());
           resolve(new Blob(chunks, { type: (rec.mimeType || "audio/webm").split(";")[0] }));
@@ -373,11 +434,34 @@ function makeRecorder() {
 const extFor = (blob) => ({ "audio/ogg": "ogg", "audio/mp4": "m4a" }[blob.type] || "webm");
 
 // ---------- Voix live ----------
+const voiceLang = (c) => (c === "auto" ? "Détection automatique" : langName(c));
+const handsFree = () => $("#voice-handsfree")?.checked && modeOf("voice") === "converse";
+
 function updateVoiceHint() {
-  const l = state.langs.find((x) => x.code === $("#voice-src").value);
-  $("#voice-hint").textContent = l?.asr
-    ? "Appuyez sur le micro, parlez, puis appuyez de nouveau : votre voix sera transcrite."
-    : `Appuyez sur le micro et parlez. La transcription automatique n'existe pas encore pour le ${l?.name || "cette langue"} : vous taperez ce que vous avez dit.`;
+  const code = $("#voice-src").value;
+  const caps = state.voiceCaps || { asr: [], tts: [], auto_detect: [] };
+  const l = state.langs.find((x) => x.code === code);
+  const hands = handsFree();
+  if (code === "auto" || l?.asr) {
+    $("#voice-hint").textContent = hands
+      ? "Appuyez une fois sur le micro puis parlez naturellement : OkapiAI vous répond à voix haute et réécoute."
+      : "Appuyez sur le micro, parlez, puis appuyez de nouveau : OkapiAI transcrit et vous répond à voix haute.";
+  } else {
+    $("#voice-hint").textContent = `Appuyez sur le micro et parlez. La transcription automatique n'existe pas encore pour le ${l?.name || "cette langue"} : vous taperez ce que vous avez dit.`;
+  }
+  const names = (codes) => codes.map(langName).join(", ") || "aucune";
+  $("#voice-asr-info").textContent = `Reconnaissance vocale : ${names(caps.asr.filter(isCongolese))}. `
+    + `Voix d'OkapiAI : ${names(caps.tts.filter(isCongolese))}.`
+    + (caps.auto_detect.length > 1 ? ` « Détection automatique » reconnaît seule : ${names(caps.auto_detect)}.` : "");
+}
+
+function fillVoiceSrc() {
+  const sel = $("#voice-src");
+  const auto = (state.voiceCaps?.auto_detect || []).length > 1;
+  $('option[value="auto"]', sel)?.remove();
+  if (auto && modeOf("voice") === "converse") {
+    sel.insertAdjacentHTML("afterbegin", `<option value="auto" class="bg-white dark:bg-obsidian-900 text-slate-900 dark:text-white">🌍 Détection automatique</option>`);
+  }
 }
 
 function setRecVisual(on) {
@@ -392,37 +476,80 @@ function setRecVisual(on) {
 function initVoice() {
   const rec = makeRecorder();
   const log = $("#voice-log");
-  $("#voice-src").addEventListener("change", () => {
-    convHistory.voice = [];
-    if (modeOf("voice") === "converse") ensureCongolese($("#voice-src"));
+  let session = false;  // mode mains libres : la conversation continue jusqu'à « Stop »
+  const ensureVoiceLang = () => {
+    const sel = $("#voice-src");
+    if (modeOf("voice") === "converse" && sel.value !== "auto") ensureCongolese(sel);
+  };
+  fillVoiceSrc();
+  if ($('#voice-src option[value="auto"]')) $("#voice-src").value = "auto";
+  $("#voice-src").addEventListener("change", () => { convHistory.voice = []; ensureVoiceLang(); updateVoiceHint(); });
+  $("#voice-handsfree").addEventListener("change", updateVoiceHint);
+  $('[data-modes="voice"]').addEventListener("modechange", () => {
+    const keep = $("#voice-src").value;
+    fillVoiceSrc();
+    $("#voice-src").value = $(`#voice-src option[value="${keep}"]`) ? keep : "ln";
+    ensureVoiceLang();
     updateVoiceHint();
   });
-  $('[data-modes="voice"]').addEventListener("modechange", (e) => { if (e.detail === "converse") ensureCongolese($("#voice-src")); updateVoiceHint(); });
 
-  $("#rec-btn").addEventListener("click", async () => {
-    if (!rec.active) {
-      try { await rec.start(); } catch { return showToast("Micro inaccessible : autorisez l'accès au micro dans le navigateur.", "error"); }
-      setRecVisual(true);
-      $("#voice-hint").textContent = "Écoute en cours… appuyez de nouveau pour terminer.";
-      return;
-    }
+  const setHint = (t) => ($("#voice-hint").textContent = t);
+
+  async function listen() {
+    stopSpeaking();
+    try {
+      await rec.start(handsFree() ? (spoke) => (spoke ? finish() : endSession("Je n'ai rien entendu. Appuyez sur le micro pour reprendre.")) : undefined);
+    } catch { session = false; return showToast("Micro inaccessible : autorisez l'accès au micro dans le navigateur.", "error"); }
+    setRecVisual(true);
+    setHint(handsFree() ? "🎙️ Je vous écoute… parlez, je réponds dès que vous vous arrêtez." : "Écoute en cours… appuyez de nouveau pour terminer.");
+  }
+
+  function endSession(message) {
+    session = false;
+    stopSpeaking();
+    rec.stop();
+    setRecVisual(false);
+    updateVoiceHint();
+    if (message) setHint(message);
+  }
+
+  async function finish() {
     setRecVisual(false);
     const blob = await rec.stop();
-    updateVoiceHint();
+    if (!blob) return;
+    setHint("⏳ OkapiAI réfléchit…");
     const src = $("#voice-src").value, tgt = $("#voice-tgt").value;
     const me = appendUser(log, `<audio controls src="${URL.createObjectURL(blob)}" class="h-8 max-w-[240px]"></audio>`, "Transcription…");
     const form = new FormData();
     form.append("audio", blob, `voix.${extFor(blob)}`);
+    let spoken = Promise.resolve(), understood = true;
     try {
       if (modeOf("voice") === "converse") {
         form.append("lang", src);
         form.append("history", JSON.stringify(convHistory.voice));
-        renderVoiceConverse(me, await api("/api/voice/converse", { method: "POST", form }), src);
+        const r = await api("/api/voice/converse", { method: "POST", form });
+        understood = Boolean(r.transcript);
+        spoken = renderVoiceConverse(me, r, src);
       } else {
         form.append("source_lang", src); form.append("target_lang", tgt);
-        renderVoiceTranslate(me, await api("/api/voice/chat", { method: "POST", form }), src, tgt);
+        spoken = renderVoiceTranslate(me, await api("/api/voice/chat", { method: "POST", form }), src, tgt);
       }
-    } catch (err) { $(".u-meta", me).textContent = `⚠️ ${err.message}`; }
+    } catch (err) { $(".u-meta", me).textContent = `⚠️ ${err.message}`; understood = false; }
+    setHint("🔊 OkapiAI vous répond…");
+    await spoken;
+    // Mains libres : on réécoute automatiquement après la réponse parlée
+    if (session && handsFree() && understood) return listen();
+    endSession(session && !understood ? "Je n'ai pas compris. Appuyez sur le micro pour réessayer, ou corrigez le texte." : "");
+  }
+
+  $("#rec-btn").addEventListener("click", async () => {
+    if (session || rec.active) {
+      if (handsFree()) return endSession("Conversation terminée. Appuyez sur le micro pour recommencer.");
+      session = false;
+      return finish();
+    }
+    session = true;
+    listen();
   });
 }
 
@@ -431,8 +558,9 @@ const voiceInput = (cls, placeholder, value) =>
 const voiceBtn = (cls, label) =>
   `<button type="button" class="${cls} px-3 py-1 rounded-lg bg-white/15 hover:bg-white/25 border border-white/30 text-xs font-bold cursor-pointer">${label}</button>`;
 
-function renderVoiceConverse(me, r, lang) {
-  $(".u-meta", me).textContent = langName(lang);
+function renderVoiceConverse(me, r, selected) {
+  const lang = r.lang || selected;  // langue détectée en mode automatique
+  $(".u-meta", me).textContent = selected === "auto" ? `${langName(lang)} (détecté)` : langName(lang);
   const box = document.createElement("form");
   box.innerHTML = voiceInput("vt-src", `Ce que vous avez dit (${langName(lang)})`, r.transcript) +
     `<div class="mt-2 flex gap-2">${voiceBtn("vt-send", r.answer ? "Renvoyer corrigé" : "Envoyer")}</div>`;
@@ -440,8 +568,9 @@ function renderVoiceConverse(me, r, lang) {
   const send = () => { const t = $(".vt-src", box).value.trim(); if (t) sendConverse($("#voice-log"), lang, t, "voice"); };
   $(".vt-send", box).onclick = send;
   box.onsubmit = (e) => { e.preventDefault(); send(); };
-  if (r.answer) renderAnswer($("#voice-log"), lang, r.transcript, r.answer, "voice");
-  else $(".vt-src", box).focus();
+  if (r.answer) return renderAnswer($("#voice-log"), lang, r.transcript, r.answer, "voice");
+  $(".vt-src", box).focus();
+  return Promise.resolve();
 }
 
 function renderVoiceTranslate(me, r, src, tgt) {
@@ -453,9 +582,11 @@ function renderVoiceTranslate(me, r, src, tgt) {
      <p class="vt-msg mt-1 text-[11px] text-okapi-yellow font-semibold"></p>`;
   $(".u-body", me).appendChild(box);
   const log = $("#voice-log");
+  let spoken = Promise.resolve();
   if (r.translation?.translation) {
     appendBot(log, `<p class="text-base font-semibold">${esc(r.translation.translation)}</p>${audioTag(r.translation.audio_url)}`, translationMeta(r.translation));
-    speak(r.translation.translation, tgt);
+    spoken = r.translation.audio_url ? playUrl(r.translation.audio_url)
+      : speak(r.translation.translation, tgt, ttsFor(r.translation.translation, tgt));
   }
   $(".vt-translate", box).onclick = async () => {
     const text = $(".vt-src", box).value.trim();
@@ -479,6 +610,7 @@ function renderVoiceTranslate(me, r, src, tgt) {
       showToast("Votre voix a été ajoutée au dataset de collecte.", "success");
     } catch (err) { $(".vt-msg", box).textContent = `⚠️ ${err.message}`; }
   };
+  return spoken;
 }
 
 // ---------- Contribuer ----------
@@ -567,7 +699,9 @@ async function loadProposals() {
         </div>
         ${progressBar(p.support, p.required)}
         <div class="flex justify-end pt-1">
-          <button type="button" data-confirm="${p.id}" class="${smallBtn}">✓ Je confirme</button>
+          ${p.voted
+            ? `<span class="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400" title="Un seul vote par personne">✓ Déjà confirmé</span>`
+            : `<button type="button" data-confirm="${p.id}" class="${smallBtn}">✓ Je confirme</button>`}
         </div>
       </div>`).join("")
       : `<p class="text-center py-6 text-xs text-slate-400 dark:text-slate-500 border border-dashed border-slate-300 dark:border-okapi-blue/25 rounded-xl">Aucune proposition en cours. Soyez le premier à contribuer !</p>`;
@@ -808,6 +942,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderAccount();
   try {
     state.langs = await api("/api/languages");
+    state.voiceCaps = await api("/api/voice/capabilities").catch(() => null);
     setApiStatus(true);
   } catch {
     setApiStatus(false);

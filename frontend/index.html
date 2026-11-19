@@ -313,6 +313,8 @@
         <div class="px-4 py-2.5 border-t border-slate-200/80 dark:border-okapi-blue/15 bg-slate-50/90 dark:bg-obsidian-900/60 flex items-center gap-2 overflow-x-auto no-scrollbar">
           <span class="text-xs text-blue-700 dark:text-okapi-cyan font-bold whitespace-nowrap">Exemples :</span>
           <button type="button" data-lang="ln" class="quick-prompt text-xs px-3 py-1.5 rounded-lg bg-white hover:bg-blue-50 dark:bg-okapi-blue/10 dark:hover:bg-okapi-blue/20 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-okapi-blue/20 whitespace-nowrap transition-colors cursor-pointer shadow-2xs">Mbote, sango nini ?</button>
+          <button type="button" data-lang="ln" class="quick-prompt text-xs px-3 py-1.5 rounded-lg bg-white hover:bg-blue-50 dark:bg-okapi-blue/10 dark:hover:bg-okapi-blue/20 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-okapi-blue/20 whitespace-nowrap transition-colors cursor-pointer shadow-2xs">Que veut dire ndako ?</button>
+          <button type="button" data-lang="ln" class="quick-prompt text-xs px-3 py-1.5 rounded-lg bg-white hover:bg-blue-50 dark:bg-okapi-blue/10 dark:hover:bg-okapi-blue/20 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-okapi-blue/20 whitespace-nowrap transition-colors cursor-pointer shadow-2xs">Comment dit-on « eau » en lingala ?</button>
           <button type="button" data-lang="sw" class="quick-prompt text-xs px-3 py-1.5 rounded-lg bg-white hover:bg-blue-50 dark:bg-okapi-blue/10 dark:hover:bg-okapi-blue/20 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-okapi-blue/20 whitespace-nowrap transition-colors cursor-pointer shadow-2xs">Habari ya asubuhi ?</button>
           <button type="button" data-lang="lua" class="quick-prompt text-xs px-3 py-1.5 rounded-lg bg-white hover:bg-blue-50 dark:bg-okapi-blue/10 dark:hover:bg-okapi-blue/20 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-okapi-blue/20 whitespace-nowrap transition-colors cursor-pointer shadow-2xs">Udi bimpe ?</button>
         </div>
@@ -358,6 +360,10 @@
             <label class="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
               <span>Je parle</span>
               <select id="voice-src" class="lang-select bg-white dark:bg-obsidian-900 border border-slate-300 dark:border-okapi-blue/25 text-slate-800 dark:text-slate-100 text-sm font-semibold rounded-xl px-3 py-2 focus:outline-none focus:border-okapi-blue"></select>
+            </label>
+            <label class="converse-only flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 cursor-pointer select-none" title="OkapiAI détecte la fin de votre phrase, répond à voix haute puis vous réécoute">
+              <input id="voice-handsfree" type="checkbox" checked class="w-4 h-4 accent-okapi-blue cursor-pointer">
+              <span>Conversation continue (mains libres)</span>
             </label>
             <label class="translate-only hidden flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
               <span>Traduire en</span>

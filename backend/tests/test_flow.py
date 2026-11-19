@@ -10,6 +10,7 @@ from pathlib import Path
 os.environ["OKAPI_DATA_DIR"] = tempfile.mkdtemp(prefix="okapi_test_")
 os.environ["OKAPI_LLM_ENABLED"] = "0"  # jamais d'appel réseau pendant les tests
 os.environ["OKAPI_MODEL_DIR"] = os.path.join(os.environ["OKAPI_DATA_DIR"], "no-model")
+os.environ["OKAPI_VOICE_WARMUP"] = "0"  # pas de chargement des modèles vocaux pendant les tests
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from fastapi.testclient import TestClient  # noqa: E402
@@ -36,10 +37,18 @@ def test_full_flow():
         assert c.post("/api/translate", json={"text": "Mbote na yo", "source_lang": "ln",
                                               "target_lang": "fr"}).json()["translation"] is None
 
-        # La même personne ne compte qu'une fois
-        for _ in range(3):
-            r = c.post("/api/contributions/text", json=item, headers=users[0])
+        # La même personne ne vote qu'une fois : les envois suivants sont refusés
+        r = c.post("/api/contributions/text", json=item, headers=users[0])
         assert r.json()["support"] == 1
+        pid = r.json()["proposition_id"]
+        for again in (item, {**item, "source_text": "mbote na yo !"}):
+            r2 = c.post("/api/contributions/text", json=again, headers=users[0])
+            assert r2.status_code == 409, r2.text
+        assert c.post(f"/api/contributions/proposals/{pid}/confirm", headers=users[0]).status_code == 409
+        props = c.get("/api/contributions/proposals", headers=users[0]).json()
+        assert next(p for p in props if p["id"] == pid)["voted"] is True
+        assert next(p for p in c.get("/api/contributions/proposals", headers=users[1]).json()
+                    if p["id"] == pid)["voted"] is False
 
         # 8 autres personnes, avec variantes proches (ponctuation / casse / faute légère)
         variants = ["mbote na yo!", "Mbote na yo.", "MBOTE NA YO", "Mbote na yo", "Mbote na yo",
@@ -52,9 +61,10 @@ def test_full_flow():
         # L'admin ne peut pas approuver avant le minimum de 10
         assert c.post(f"/api/admin/propositions/{pid}/approve", headers=admin).status_code == 400
 
-        # 10e personne confirme via la liste des propositions
+        # 10e personne confirme via la liste des propositions, une seule fois
         r = c.post(f"/api/contributions/proposals/{pid}/confirm", headers=users[9])
         assert r.json()["status"] == "en_attente_admin", r.json()
+        assert c.post(f"/api/contributions/proposals/{pid}/confirm", headers=users[9]).status_code in (404, 409)
 
         pending = c.get("/api/admin/propositions", headers=admin).json()
         assert [p["id"] for p in pending] == [pid]
@@ -76,7 +86,7 @@ def test_full_flow():
         assert r.json()["proposition_id"] != pid and r.json()["support"] == 1
 
         stats = c.get("/api/admin/stats", headers=admin).json()
-        assert stats["dataset_entrainement"] == 1 and stats["dataset_collecte"] == 13
+        assert stats["dataset_entrainement"] == 1 and stats["dataset_collecte"] == 11
 
         assert c.get("/api/learn/cards?lang=ln").json()[0]["meaning"] == "Bonjour à toi"
         assert "Mbote na yo" in c.get("/api/admin/export/entrainement.jsonl", headers=admin).text
@@ -99,6 +109,19 @@ def test_voice_contribution_and_audio_access():
         assert c.get(f"{url}?token={tok_o}").status_code == 403   # autre utilisateur
         assert c.get(f"{url}?token={tok_h}").status_code == 200   # propriétaire
 
+        # Une 2e voix sur la même proposition est refusée (un seul vote)
+        r = c.post("/api/contributions/voice", headers=h, files={"audio": fake}, data={
+            "source_lang": "lua", "source_text": "Moyo webe", "target_lang": "fr", "target_text": "Bonjour"})
+        assert r.status_code == 409, r.text
+
+        # Ajouter sa voix à un vote texte ne crée pas de 2e vote
+        item = {"source_lang": "lua", "source_text": "Wewe biani", "target_lang": "fr", "target_text": "Comment vas-tu"}
+        assert c.post("/api/contributions/text", json=item, headers=other).status_code == 200
+        r = c.post("/api/contributions/voice", headers=other, files={"audio": fake}, data=item)
+        assert r.status_code == 200 and r.json()["support"] == 1, r.text
+        mine_o = c.get("/api/contributions/mine", headers=other).json()
+        assert len(mine_o) == 1 and mine_o[0]["kind"] == "voix"
+
         r = c.post("/api/contributions/voice", headers=h, files={"audio": ("x.txt", b"hi", "text/plain")},
                    data={"source_lang": "lua", "source_text": "a", "target_lang": "fr", "target_text": "b"})
         assert r.status_code == 400
@@ -116,8 +139,13 @@ def test_conversation_dialogue_and_ai():
         dlg = {"kind": "dialogue", "source_lang": "ln", "source_text": "Ozali malamu?",
                "target_lang": "ln", "target_text": "Ee, nazali malamu. Na yo?"}
 
-        r = c.post("/api/converse", json={"lang": "ln", "message": "Ozali malamu?"}).json()
+        # Message inconnu (sans IA) : le bot demande qu'on lui apprenne la réponse
+        r = c.post("/api/converse", json={"lang": "ln", "message": "Motuka na yo ezali langi nini?"}).json()
         assert r["reply"] is None and "Apprenez-moi" in r["hint"]
+
+        # Échange de base : le bot répond dans la langue, avec la traduction française
+        r = c.post("/api/converse", json={"lang": "ln", "message": "Ozali malamu?"}).json()
+        assert r["method"] == "base" and r["reply"].startswith("Nazali malamu") and r["reply_fr"]
 
         # dialogue dans deux langues différentes : refusé ; conversation en français : refusée
         bad = {**dlg, "target_lang": "fr"}
@@ -161,8 +189,89 @@ def test_conversation_dialogue_and_ai():
         assert any("Ozali malamu?" in e["texte"] for e in seen["examples"])
 
 
+def test_word_meaning():
+    from app.services.conversation import parse_word_question
+    assert parse_word_question("Que veut dire ndako ?") == ("sens", "ndako")
+    assert parse_word_question("C'est quoi le mot « mwasi » ?") == ("sens", "mwasi")
+    assert parse_word_question("Ndako elingi koloba nini?") == ("sens", "ndako")
+    assert parse_word_question("Signification de mbote en lingala") == ("sens", "mbote")
+    assert parse_word_question("Comment dit-on maison en lingala ?") == ("traduire", "maison")
+    assert parse_word_question("Mbote, ozali malamu?") is None
+
+    with TestClient(app) as c:
+        ask = lambda msg: c.post("/api/converse", json={"lang": "ln", "message": msg}).json()
+        r = ask("Que veut dire ndako ?")
+        assert r["method"] == "lexique" and "elingi koloba" in r["reply"] and "maison" in r["reply"], r
+        assert "signifie" in r["reply_fr"] and r["word"]["meanings"][0]["word"] == "ndáko"
+
+        r = ask("ndako")  # mot seul
+        assert r["method"] == "lexique" and "maison" in r["reply"]
+
+        r = ask("mbɔ́tɛ elingi koloba nini?")  # avec les tons
+        assert r["method"] == "lexique" and "bonjour" in r["reply"]
+
+        r = ask("Comment dit-on maison en lingala ?")
+        assert r["method"] == "lexique" and "ndáko" in r["reply"] and r["reply"].startswith("Na lingala")
+
+        r = ask("Que veut dire xqzwv ?")  # mot inconnu : réponse en lingala, pas d'invention
+        assert r["method"] == "inconnu" and r["reply"].startswith("Nayebi naino")
+
+        # Un mot validé par la communauté passe avant le dictionnaire
+        users = [_user(c, f"mot{i}") for i in range(10)]
+        item = {"source_lang": "ln", "source_text": "matondi", "target_lang": "fr", "target_text": "merci"}
+        for h in users:
+            r2 = c.post("/api/contributions/text", json=item, headers=h)
+        pid = r2.json()["proposition_id"]
+        assert c.post(f"/api/admin/propositions/{pid}/approve", headers=_admin(c)).status_code == 200
+        r = ask("que signifie matondi")
+        assert r["method"] == "dataset" and "merci" in r["reply"]
+
+
+def test_voice_live_conversation():
+    """Voix live : langue détectée, réponse dans cette langue, avec une voix à écouter."""
+    from app.routers import chat as chat_router
+    from app.services.tts import synthesizer
+
+    rec, syn = chat_router.recognizer, synthesizer
+    saved = (rec.detect_and_transcribe, rec.auto_langs, rec.transcribe, rec.supports, syn.supports, syn.synthesize)
+    wav = Path(os.environ["OKAPI_DATA_DIR"]) / "fake.wav"
+    wav.write_bytes(b"RIFF0000WAVEfmt ")
+    try:
+        rec.auto_langs = lambda: ["ln", "sw"]
+        rec.detect_and_transcribe = lambda path: ("sw", "habari yako")
+        rec.supports = lambda lang: lang in ("ln", "sw")
+        rec.transcribe = lambda path, lang: "mbote"
+        syn.supports = lambda lang: lang in ("ln", "sw")
+        syn.synthesize = lambda text, lang: wav if lang in ("ln", "sw") else None
+        fake = ("a.webm", b"\x1a\x45\xdf\xa3fake-webm", "audio/webm")
+        with TestClient(app) as c:
+            caps = c.get("/api/voice/capabilities").json()
+            assert caps["auto_detect"] == ["ln", "sw"] and "ln" in caps["tts"]
+
+            # détection automatique : l'utilisateur parle swahili -> OkapiAI répond en swahili
+            r = c.post("/api/voice/converse", files={"audio": fake}, data={"lang": "auto"}).json()
+            assert r["lang"] == "sw" and r["transcript"] == "habari yako"
+            assert r["answer"]["method"] == "base" and r["answer"]["reply"].startswith("Nzuri")
+            assert r["answer"]["tts_url"].startswith("/api/tts?lang=sw&text=")
+
+            # langue choisie : lingala
+            r = c.post("/api/voice/converse", files={"audio": fake}, data={"lang": "ln"}).json()
+            assert r["lang"] == "ln" and r["answer"]["reply"].startswith("Mbote")
+            audio = c.get(r["answer"]["tts_url"])
+            assert audio.status_code == 200 and audio.headers["content-type"] == "audio/wav"
+
+            # pas de voix pour le kikongo : pas d'URL, et /api/tts répond 404
+            r = c.post("/api/converse", json={"lang": "kg", "message": "mbote"}).json()
+            assert r.get("tts_url") is None
+            assert c.get("/api/tts", params={"lang": "kg", "text": "mbote"}).status_code == 404
+    finally:
+        (rec.detect_and_transcribe, rec.auto_langs, rec.transcribe, rec.supports, syn.supports, syn.synthesize) = saved
+
+
 if __name__ == "__main__":
     test_full_flow()
     test_voice_contribution_and_audio_access()
     test_conversation_dialogue_and_ai()
+    test_word_meaning()
+    test_voice_live_conversation()
     print("OK")

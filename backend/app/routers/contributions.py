@@ -10,7 +10,7 @@ from ..config import AUDIO_DIR, MIN_SIMILAR
 from ..database import get_db
 from ..models import COLLECTE, Contribution, Proposition, User
 from ..schemas import ContributionIn, check_langs
-from ..security import get_current_user
+from ..security import get_current_user, get_optional_user
 from ..services import dataset
 from ..services.audio import save_audio
 from ..services.translator import audio_url
@@ -35,6 +35,8 @@ def _add(db: Session, user: User, body: ContributionIn, audio: Optional[str]) ->
     check_langs(body.source_lang, body.target_lang, kind=body.kind)
     try:
         c = dataset.add_contribution(db, user, audio_path=audio, **body.model_dump())
+    except dataset.AlreadyVoted as exc:
+        raise HTTPException(409, str(exc))
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     return _result(db, c)
@@ -57,7 +59,8 @@ async def add_voice(
 ):
     """Voix qui prononce `source_text` (traduction) ou la réponse `target_text` (dialogue). Envoyer soit `audio` (fichier), soit `audio_file`
     (nom renvoyé par /api/voice/chat)."""
-    if audio is not None and audio.filename:
+    uploaded = audio is not None and bool(audio.filename)
+    if uploaded:
         name = await save_audio(audio)
     elif audio_file and _AUDIO_NAME.match(audio_file) and (AUDIO_DIR / audio_file).exists():
         name = audio_file
@@ -67,21 +70,31 @@ async def add_voice(
         raise HTTPException(400, "Type de contribution inconnu")
     body = ContributionIn(kind=kind, source_lang=source_lang, source_text=source_text,
                           target_lang=target_lang, target_text=target_text)
-    return _add(db, user, body, name)
+    try:
+        return _add(db, user, body, name)
+    except HTTPException:
+        if uploaded:  # vote refusé : ne pas garder l'enregistrement orphelin
+            (AUDIO_DIR / name).unlink(missing_ok=True)
+        raise
 
 
 @router.get("/proposals")
-def open_proposals(lang: Optional[str] = None, limit: int = 30, db: Session = Depends(get_db)):
-    """Propositions en cours de collecte que les autres peuvent confirmer."""
+def open_proposals(lang: Optional[str] = None, limit: int = 30,
+                   user: Optional[User] = Depends(get_optional_user), db: Session = Depends(get_db)):
+    """Propositions en cours de collecte que les autres peuvent confirmer.
+    `voted` indique si la personne connectée a déjà proposé ou confirmé."""
     q = select(Proposition).where(Proposition.status == COLLECTE)
     if lang:
         q = q.where((Proposition.source_lang == lang) | (Proposition.target_lang == lang))
+    props = list(db.scalars(q.order_by(Proposition.id.desc()).limit(min(limit, 100))))
+    voted = dataset.voted_ids(db, user.id, [p.id for p in props]) if user else set()
     out = []
-    for p in db.scalars(q.order_by(Proposition.id.desc()).limit(min(limit, 100))):
+    for p in props:
         src, tgt = dataset.canonical_variant(p)
         out.append({"id": p.id, "kind": p.kind, "source_lang": p.source_lang, "source_text": src,
                     "target_lang": p.target_lang, "target_text": tgt,
-                    "support": dataset.support_count(db, p.id), "required": MIN_SIMILAR})
+                    "support": dataset.support_count(db, p.id), "required": MIN_SIMILAR,
+                    "voted": p.id in voted})
     return out
 
 
@@ -94,6 +107,10 @@ async def confirm_proposal(
     p = db.get(Proposition, proposition_id)
     if p is None or p.status != COLLECTE:
         raise HTTPException(404, "Proposition introuvable ou déjà clôturée")
+    existing = dataset.user_vote(db, user.id, p.id)
+    has_audio = audio is not None and bool(audio.filename)
+    if existing is not None and (existing.audio_path or not has_audio):
+        raise HTTPException(409, str(dataset.AlreadyVoted()))  # avant d'enregistrer l'audio
     src, tgt = dataset.canonical_variant(p)
     name = await save_audio(audio) if audio is not None and audio.filename else None
     body = ContributionIn(kind=p.kind, source_lang=p.source_lang, source_text=src,

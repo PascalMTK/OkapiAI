@@ -1,6 +1,8 @@
 """Point d'entrée OkapiAI.  Lancer :  uvicorn app.main:app --reload  (depuis backend/)"""
 import logging
+import os
 import re
+import threading
 from contextlib import asynccontextmanager
 from typing import Optional
 
@@ -17,6 +19,7 @@ from .routers import admin, auth, chat, contributions, learn
 from .security import hash_password, user_from_token
 from .services.llm import claude_chat
 from .services.speech import recognizer
+from .services.tts import synthesizer
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("okapiai")
@@ -44,6 +47,30 @@ def _migrate() -> None:
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN kind VARCHAR(16) NOT NULL DEFAULT 'traduction'"))
             log.info("Migration : colonne 'kind' ajoutée à %s", table)
 
+    # Un seul vote par personne et par proposition : fusionner les doublons
+    # (on garde la contribution la plus ancienne, avec la première voix trouvée), puis index unique.
+    if "uq_collecte_user_proposition" not in {i["name"] for i in insp.get_indexes("dataset_collecte")}:
+        with engine.begin() as conn:
+            dupes = conn.execute(text(
+                "SELECT user_id, proposition_id FROM dataset_collecte "
+                "GROUP BY user_id, proposition_id HAVING COUNT(*) > 1")).all()
+            removed = 0
+            for user_id, prop_id in dupes:
+                rows = conn.execute(text(
+                    "SELECT id, audio_path FROM dataset_collecte WHERE user_id = :u AND proposition_id = :p "
+                    "ORDER BY id"), {"u": user_id, "p": prop_id}).all()
+                keep = rows[0]
+                audio = keep.audio_path or next((r.audio_path for r in rows if r.audio_path), None)
+                if audio and not keep.audio_path:
+                    conn.execute(text("UPDATE dataset_collecte SET audio_path = :a, kind = 'voix' WHERE id = :i"),
+                                 {"a": audio, "i": keep.id})
+                ids = [r.id for r in rows[1:]]
+                conn.execute(text(f"DELETE FROM dataset_collecte WHERE id IN ({','.join(map(str, ids))})"))
+                removed += len(ids)
+            conn.execute(text("CREATE UNIQUE INDEX uq_collecte_user_proposition "
+                              "ON dataset_collecte (user_id, proposition_id)"))
+        log.info("Migration : un vote par personne (%d doublon(s) fusionné(s))", removed)
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -52,6 +79,9 @@ async def lifespan(_: FastAPI):
     _bootstrap_admin()
     log.info("Conversation IA : %s", "activée" if claude_chat.enabled() else
              "désactivée (installez 'anthropic' et définissez ANTHROPIC_API_KEY)")
+    if os.getenv("OKAPI_VOICE_WARMUP", "1") == "1":
+        # Charge la reconnaissance vocale et les voix sans bloquer le démarrage du serveur
+        threading.Thread(target=lambda: (recognizer.warmup(), synthesizer.warmup()), daemon=True).start()
     yield
 
 

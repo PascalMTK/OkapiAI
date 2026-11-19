@@ -13,6 +13,7 @@ from collections import Counter
 from typing import Optional
 
 from sqlalchemy import distinct, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..config import MIN_SIMILAR, SIMILARITY_THRESHOLD
@@ -36,6 +37,25 @@ def find_proposition(db: Session, kind: str, source_lang: str, target_lang: str,
         if score >= SIMILARITY_THRESHOLD and score > best_score:
             best, best_score = p, score
     return best
+
+
+class AlreadyVoted(ValueError):
+    """La personne a déjà proposé ou confirmé cette proposition."""
+
+    def __init__(self):
+        super().__init__("Vous avez déjà proposé ou confirmé cette traduction : un seul vote par personne.")
+
+
+def user_vote(db: Session, user_id: int, proposition_id: int) -> Optional[Contribution]:
+    return db.scalar(select(Contribution).where(
+        Contribution.user_id == user_id, Contribution.proposition_id == proposition_id))
+
+
+def voted_ids(db: Session, user_id: int, proposition_ids: list[int]) -> set[int]:
+    if not proposition_ids:
+        return set()
+    return set(db.scalars(select(Contribution.proposition_id).where(
+        Contribution.user_id == user_id, Contribution.proposition_id.in_(proposition_ids))))
 
 
 def support_count(db: Session, proposition_id: int) -> int:
@@ -65,6 +85,17 @@ def add_contribution(db: Session, user: User, *, source_lang: str, source_text: 
                            source_norm=src_norm, target_norm=tgt_norm)
         db.add(prop)
         db.flush()
+    else:
+        existing = user_vote(db, user.id, prop.id)
+        if existing is not None:
+            # Seule exception : ajouter sa voix à un vote texte, sans compter un 2e vote
+            if audio_path and not existing.audio_path:
+                existing.audio_path, existing.kind = audio_path, "voix"
+                refresh_status(db, prop, new_audio=audio_path)
+                db.commit()
+                return existing
+            db.rollback()
+            raise AlreadyVoted()
 
     contrib = Contribution(
         user_id=user.id, proposition_id=prop.id,
@@ -74,7 +105,11 @@ def add_contribution(db: Session, user: User, *, source_lang: str, source_text: 
         audio_path=audio_path,
     )
     db.add(contrib)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError:  # deux requêtes simultanées de la même personne
+        db.rollback()
+        raise AlreadyVoted()
     refresh_status(db, prop, new_audio=audio_path)
     db.commit()
     return contrib

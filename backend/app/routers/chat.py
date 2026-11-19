@@ -1,7 +1,9 @@
 """Chatbot : traduction, conversation en langue nationale (texte et voix)."""
 import json
+from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import TypeAdapter, ValidationError
 from sqlalchemy.orm import Session
 
@@ -11,13 +13,39 @@ from ..schemas import ChatTurn, ConverseIn, TranslateIn, check_langs
 from ..services import conversation, translator
 from ..services.audio import save_audio
 from ..services.speech import recognizer
+from ..services.tts import MAX_CHARS, synthesizer
 
 router = APIRouter(prefix="/api", tags=["chat"])
+AUTO = "auto"  # voix live : détecter la langue nationale parlée
 
 
 @router.get("/languages")
 def languages():
-    return [{"code": c, "name": n, "asr": recognizer.supports(c)} for c, n in LANGUAGES.items()]
+    return [{"code": c, "name": n, "asr": recognizer.supports(c), "tts": synthesizer.supports(c)}
+            for c, n in LANGUAGES.items()]
+
+
+@router.get("/voice/capabilities")
+def voice_capabilities():
+    """Ce que la voix live sait faire : reconnaissance, voix du bot, détection automatique."""
+    return {"auto_detect": recognizer.auto_langs(),
+            "asr": [c for c in LANGUAGES if recognizer.supports(c)],
+            "tts": [c for c in LANGUAGES if synthesizer.supports(c)]}
+
+
+@router.get("/tts")
+def tts(text: str = Query(..., min_length=1, max_length=MAX_CHARS), lang: str = Query(...)):
+    """Fait parler OkapiAI : renvoie la phrase prononcée (WAV) dans la langue nationale."""
+    if lang not in LANGUAGES:
+        raise HTTPException(400, "Langue inconnue")
+    path = synthesizer.synthesize(text, lang)
+    if path is None:
+        raise HTTPException(404, f"Pas de voix disponible pour le {LANGUAGES[lang].lower()}")
+    return FileResponse(path, media_type="audio/wav", headers={"Cache-Control": "public, max-age=86400"})
+
+
+def tts_url(text: str, lang: str):
+    return f"/api/tts?lang={lang}&text={quote(text)}" if text and synthesizer.supports(lang) else None
 
 
 @router.post("/translate")
@@ -73,6 +101,7 @@ def _check_conv_lang(lang: str) -> None:
 
 
 def _with_hint(res: dict) -> dict:
+    res["tts_url"] = None if res.get("audio_url") else tts_url(res.get("reply"), res["lang"])
     if res["reply"] is None:
         res["hint"] = ("Je ne sais pas encore répondre à ce message dans cette langue. "
                        "Apprenez-moi : écrivez la réponse qu'une personne donnerait !")
@@ -99,16 +128,23 @@ async def voice_converse(
     history: str = Form("[]"),
     db: Session = Depends(get_db),
 ):
-    """Conversation vocale : transcription (si disponible) puis réponse dans la même langue."""
-    _check_conv_lang(lang)
+    """Conversation vocale : transcription puis réponse parlée dans la même langue.
+    `lang="auto"` : OkapiAI reconnaît lui-même la langue nationale parlée (lingala / swahili)."""
+    if lang != AUTO:
+        _check_conv_lang(lang)
     try:
         turns = [t.model_dump() for t in _history_adapter.validate_python(json.loads(history))][-20:]
     except (json.JSONDecodeError, ValidationError):
         raise HTTPException(400, "Historique invalide")
     name = await save_audio(audio)
-    transcript = recognizer.transcribe(AUDIO_DIR / name, lang)
-    out = {"audio_file": name, "transcript": transcript,
-           "asr_available": recognizer.supports(lang), "answer": None}
+    if lang == AUTO:
+        detected, transcript = recognizer.detect_and_transcribe(AUDIO_DIR / name)
+        lang = detected or "ln"
+        asr = bool(recognizer.auto_langs())
+    else:
+        transcript, asr = recognizer.transcribe(AUDIO_DIR / name, lang), recognizer.supports(lang)
+    out = {"audio_file": name, "transcript": transcript, "lang": lang,
+           "asr_available": asr, "answer": None}
     if transcript:
         out["answer"] = _with_hint(conversation.converse(db, lang, transcript, turns))
     return out

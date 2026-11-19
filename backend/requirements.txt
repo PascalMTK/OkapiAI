@@ -7,5 +7,11 @@ pyjwt>=2.9
 # Optionnel : conversation IA en langue nationale (Claude)
 # anthropic>=1.0
 
-# Optionnel : reconnaissance vocale (swahili, lingala, français)
+# Optionnel : voix live (reconnaissance + voix d'OkapiAI en lingala / swahili, Meta MMS)
+# torch>=2.2
+# transformers>=4.40
+# huggingface_hub>=0.23
+# imageio-ffmpeg>=0.5
+
+# Optionnel : autre moteur de reconnaissance vocale (OKAPI_ASR=whisper)
 # faster-whisper>=1.0

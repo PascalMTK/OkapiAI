@@ -78,8 +78,26 @@ uvicorn app.main:app --reload
 
 ```bash
 pip install anthropic          # conversation IA en langue nationale
-pip install faster-whisper     # reconnaissance vocale (swahili, lingala, français)
+pip install torch transformers huggingface_hub imageio-ffmpeg   # voix live (MMS)
 ```
+
+#### Voix live : parler avec OkapiAI
+
+La voix live utilise les modèles **Meta MMS** : on parle, OkapiAI transcrit, répond dans la même langue **à voix haute**, puis réécoute (mode « Conversation continue »). En « Détection automatique », il reconnaît seul la langue parlée.
+
+| Langue | Reconnaissance vocale | Voix d'OkapiAI |
+|---|---|---|
+| Lingala | ✅ `facebook/mms-1b-all` (adaptateur `lin`) | ✅ `khof312/mms-tts-lin` |
+| Swahili | ✅ `facebook/mms-1b-all` (adaptateur `swh`) | ✅ `facebook/mms-tts-swh` |
+| Kikongo, tshiluba | ⏳ pas encore de modèle public : on tape ce qu'on a dit | ⏳ pas encore |
+
+Téléchargement unique des modèles (~4,3 Go, GPU conseillé mais pas obligatoire) :
+
+```bash
+python -c "from huggingface_hub import snapshot_download as d; d('khof312/mms-tts-lin'); d('facebook/mms-tts-swh'); d('facebook/mms-1b-all', allow_patterns=['*.json','model.safetensors','adapter.lin.safetensors','adapter.swh.safetensors','adapter.fra.safetensors'])"
+```
+
+Les modèles sont chargés au démarrage du serveur (en arrière-plan). Variables utiles : `OKAPI_ASR=off`, `OKAPI_TTS=off`, `OKAPI_VOICE_WARMUP=0`. Les voix MMS sont sous licence **CC BY-NC 4.0** (usage non commercial).
 
 ## 🧭 Validation des données
 
@@ -210,8 +228,27 @@ OkapiAI/
 │   ├── training/                # Export du dataset et fine-tuning
 │   └── tests/
 ├── frontend/                    # Interface web (HTML · Tailwind · JavaScript)
+├── app/                         # Recherche et dictée sur le corpus lingala (Node, port 8787)
+├── dataset/                     # Corpus lingala (métadonnées versionnées, audio local)
+│   ├── clips/<video_id>/        # Extraits de cours YouTube + metadata.jsonl (à relire)
+│   ├── knowledge/               # Lexique, grammaire et sections Wikipédia
+│   ├── sources/                 # LRSC (parole lue, CC BY 4.0) · Peace Corps · Kaikki
+│   └── raw/                     # Téléchargements bruts (non versionnés, sauf wikipedia/)
+├── tools/                       # Scripts de collecte, d'import et de relecture du corpus
 └── docs/
 ```
+
+### Corpus lingala (`dataset/` et `tools/`)
+
+| Commande | Rôle |
+|---|---|
+| `python tools/cut_videos.py <lien YouTube>` | Télécharge une vidéo ou un Short et la découpe en phrases |
+| `python tools/import_lrsc.py` | Importe le Lingala Read Speech Corpus (Hugging Face) |
+| `python tools/import_peace_corps.py` · `import_wikipedia.py` · `import_maloba.py` | Importent les sources texte |
+| `python tools/tag_language.py` · `transcribe_ln.py` | Repèrent et transcrivent les passages en lingala des clips |
+| `python tools/review_server.py` | Interface de relecture des clips (http://localhost:8765) |
+
+L'application de recherche se lance avec `node app/server.mjs` (Node 20+), puis http://127.0.0.1:8787.
 
 **Stack :** FastAPI · SQLAlchemy 2 · SQLite / PostgreSQL · Tailwind CSS · Lucide · JavaScript · Hugging Face Transformers · Anthropic SDK · faster-whisper
 
@@ -246,7 +283,7 @@ Pour contribuer au code :
 3. Ouvrez une *pull request* qui décrit le changement
 
 > [!CAUTION]
-> Ne commitez jamais le dataset (`backend/data/`, exports `*.jsonl`) ni les modèles entraînés : ils sont exclus par le `.gitignore`.
+> Ne commitez jamais les données de la plateforme (`backend/data/`, exports `*.jsonl`), les fichiers audio ni les modèles entraînés : ils sont exclus par le `.gitignore`. Seules les métadonnées de `dataset/` sont versionnées.
 
 ## 📄 Licence
 

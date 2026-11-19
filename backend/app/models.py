@@ -10,7 +10,7 @@ Deux datasets distincts :
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import ForeignKey, String, Text, Integer
+from sqlalchemy import ForeignKey, Index, String, Text, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -64,6 +64,8 @@ class Proposition(Base):
 class Contribution(Base):
     """Dataset 1 : données collectées (brutes)."""
     __tablename__ = "dataset_collecte"
+    # une personne = un seul vote (proposition ou confirmation) par proposition
+    __table_args__ = (Index("uq_collecte_user_proposition", "user_id", "proposition_id", unique=True),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)

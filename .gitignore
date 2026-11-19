@@ -1,19 +1,26 @@
+# Python / Node
 __pycache__/
 *.pyc
 .venv/
 venv/
+node_modules/
+*.log
+.env
+
+# Backend (runtime data, trained models, exports)
 backend/data/
 backend/models/
-*.db
-.env
 backend/training/export/
-*.jsonl
+*.db
 
-# Dataset (metadata and texts are versioned, audio and downloads are not)
+# JSONL is ignored everywhere except the dataset
+*.jsonl
 !dataset/**/*.jsonl
-dataset/raw/
+
+# Dataset: metadata and texts are versioned, audio and downloads are not
+dataset/raw/*
+!dataset/raw/wikipedia/
 dataset/clips/**/*.wav
 dataset/sources/lrsc/**/*.wav
 dataset/sources/maloba/
-*.log
-!/kaikki.org-dictionary-Lingala.jsonl
+dataset/vocab_candidates.jsonl
