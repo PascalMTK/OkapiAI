@@ -2,151 +2,657 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>OkapiAI</title>
-  <meta name="theme-color" content="#050a18">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OkapiAI — Intelligence Artificielle des Langues Congolaises</title>
+  <meta name="theme-color" content="#f4f8ff">
+  
+  <!-- Google Fonts: Inter & Montserrat -->
   <link rel="icon" href="/assets/logo.jpg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;900&display=swap">
-  <link rel="stylesheet" href="/style.css?v=5">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            display: ['Montserrat', 'sans-serif'],
+          },
+          colors: {
+            obsidian: {
+              950: '#02040a',
+              900: '#060c1a',
+              850: '#0a1429',
+              800: '#0f1e3d',
+            },
+            okapi: {
+              blue: '#007fff',
+              cyan: '#00a8e8',
+              yellow: '#f7d117',
+              red: '#ce1021',
+              emerald: '#10b981'
+            }
+          },
+          animation: {
+            'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'ripple': 'ripple 1.5s infinite ease-out',
+          },
+          keyframes: {
+            ripple: {
+              '0%': { transform: 'scale(0.95)', opacity: '0.8' },
+              '100%': { transform: 'scale(1.6)', opacity: '0' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom Scrollbar for sleek appearance */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #e2e8f0;
+    }
+    .dark ::-webkit-scrollbar-track {
+      background: #080e1e;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #94a3b8;
+      border-radius: 9999px;
+    }
+    .dark ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+    }
+
+    /* Adaptive Glassmorphism utilities (Light Mode default + Dark Mode support) */
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(0, 127, 255, 0.16);
+      box-shadow: 0 10px 30px -5px rgba(0, 82, 180, 0.07), 0 4px 12px -2px rgba(15, 23, 42, 0.04);
+    }
+    .dark .glass-panel {
+      background: rgba(6, 12, 26, 0.78);
+      border: 1px solid rgba(0, 127, 255, 0.18);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+
+    .glass-header {
+      background: rgba(255, 255, 255, 0.90);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(0, 127, 255, 0.15);
+    }
+    .dark .glass-header {
+      background: rgba(2, 4, 10, 0.90);
+      border-bottom: 1px solid rgba(0, 127, 255, 0.18);
+    }
+
+    /* Electric Blue Logo Wordmark Gradient */
+    .okapi-blue-text {
+      background: linear-gradient(180deg, #0088ff 0%, #0055cc 60%, #002b7f 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .dark .okapi-blue-text {
+      background: linear-gradient(180deg, #38bdf8 0%, #007fff 55%, #003580 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    /* DRC Tricolor Accent Bar (Blue / Yellow / Red) */
+    .drc-swoosh {
+      background: linear-gradient(90deg, #007fff 0%, #007fff 38%, #f7d117 38%, #f7d117 68%, #ce1021 68%, #ce1021 100%);
+    }
+
+    /* Circuit Pulse Glow */
+    .circuit-glow {
+      box-shadow: 0 4px 18px rgba(0, 127, 255, 0.22);
+    }
+    .dark .circuit-glow {
+      box-shadow: 0 0 20px rgba(0, 127, 255, 0.35), inset 0 0 12px rgba(0, 210, 255, 0.2);
+    }
+
+    /* Hide scrollbar for horizontal nav on mobile */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
 </head>
-<body>
-<header>
-  <div class="brand">
-    <span class="logo"><img src="/assets/logo.jpg" alt="Logo OkapiAI"></span>
-    <div>
-      <div class="wordmark">OKAPI <span>AI</span></div>
-      <div class="tagline">Lingala · Swahili · Kikongo · Tshiluba</div>
-    </div>
+<body class="bg-slate-50 dark:bg-obsidian-950 text-slate-800 dark:text-slate-100 font-sans antialiased min-h-screen flex flex-col selection:bg-okapi-blue/20 selection:text-blue-900 dark:selection:text-cyan-200 transition-colors duration-300">
+
+  <!-- Ambient Background Glows (Soft Airy Blue, Gold & Crimson in Light Mode) -->
+  <div class="fixed inset-0 overflow-hidden pointer-events-none z-0">
+    <div class="absolute -top-40 -left-40 w-[28rem] h-[28rem] bg-sky-300/30 dark:bg-okapi-blue/15 rounded-full blur-3xl"></div>
+    <div class="absolute top-1/3 -right-40 w-[30rem] h-[30rem] bg-blue-200/35 dark:bg-cyan-500/10 rounded-full blur-3xl"></div>
+    <div class="absolute -bottom-40 left-1/4 w-96 h-96 bg-amber-200/35 dark:bg-okapi-yellow/10 rounded-full blur-3xl"></div>
+    <div class="absolute bottom-10 right-1/4 w-72 h-72 bg-rose-200/25 dark:bg-okapi-red/10 rounded-full blur-3xl"></div>
   </div>
-  <div id="account"></div>
-</header>
 
-<nav>
-  <button data-tab="chat" class="active">💬 Chat</button>
-  <button data-tab="voice">🎙️ Voix live</button>
-  <button data-tab="contribute">➕ Contribuer</button>
-  <button data-tab="learn">📚 Apprendre</button>
-  <button data-tab="admin" id="admin-tab" hidden>🛡️ Admin</button>
-</nav>
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
 
-<main>
-  <!-- CHAT / TRADUCTION -->
-  <section id="tab-chat" class="tab active">
-    <div class="modes" data-modes="chat">
-      <button type="button" data-mode="converse" class="active">🗣️ Converser</button>
-      <button type="button" data-mode="translate">🔁 Traduire</button>
-    </div>
-    <div class="langbar">
-      <select id="chat-src" class="lang"></select>
-      <button class="icon translate-only" id="chat-swap" title="Inverser">⇄</button>
-      <select id="chat-tgt" class="lang translate-only"></select>
-      <span id="ai-badge" class="tag converse-only"></span>
-    </div>
-    <div id="chat-log" class="log"></div>
-    <form id="chat-form" class="composer">
-      <input id="chat-input" placeholder="Écrivez dans la langue choisie…" autocomplete="off" required>
-      <button type="submit">Envoyer</button>
-    </form>
-  </section>
-
-  <!-- VOIX LIVE -->
-  <section id="tab-voice" class="tab">
-    <div class="modes" data-modes="voice">
-      <button type="button" data-mode="converse" class="active">🗣️ Converser</button>
-      <button type="button" data-mode="translate">🔁 Traduire</button>
-    </div>
-    <div class="langbar">
-      <label>Je parle <select id="voice-src" class="lang"></select></label>
-      <label class="translate-only">Traduire en <select id="voice-tgt" class="lang"></select></label>
-    </div>
-    <div class="center">
-      <button id="rec-btn" class="rec">🎙️<br>Appuyer pour parler</button>
-      <p id="voice-hint" class="muted"></p>
-    </div>
-    <div id="voice-log" class="log"></div>
-  </section>
-
-  <!-- CONTRIBUER -->
-  <section id="tab-contribute" class="tab">
-    <div class="card">
-      <h2>Ajouter au dataset</h2>
-      <p class="muted">Une donnée entre dans le dataset d'entraînement quand au moins
-        <b class="min-similar">10</b> personnes différentes proposent la même chose,
-        puis qu'un administrateur la valide.</p>
-      <div class="modes" data-modes="contrib">
-        <button type="button" data-mode="translate" class="active">🔁 Traduction</button>
-        <button type="button" data-mode="converse">🗣️ Dialogue (apprendre au bot à converser)</button>
-      </div>
-      <form id="contrib-form" class="grid">
-        <label>Langue <select name="source_lang" class="lang"></select></label>
-        <label><span class="translate-only">Phrase</span><span class="converse-only">Message (ce qu'on dit au bot)</span>
-          <input name="source_text" required></label>
-        <label class="translate-only">Traduite en <select name="target_lang" class="lang"></select></label>
-        <label><span class="translate-only">Traduction</span><span class="converse-only">Réponse (ce que le bot devrait répondre)</span>
-          <input name="target_text" required></label>
-        <div class="recorder" data-recorder="contrib">
-          <button type="button" class="rec-small">🎙️ Enregistrer ma voix (optionnel)</button>
-          <audio controls hidden></audio>
+  <!-- HEADER -->
+  <header class="sticky top-0 z-40 glass-header transition-colors duration-300">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 h-18 sm:h-20 flex items-center justify-between gap-4 py-2">
+      <!-- Brand Identity matching the Geometric Okapi Emblem -->
+      <div class="flex items-center gap-3.5">
+        <div class="relative w-12 h-12 sm:w-14 sm:h-14 rounded-2xl overflow-hidden bg-slate-950 border-2 border-okapi-blue/40 p-1 circuit-glow flex-shrink-0 flex items-center justify-center shadow-md">
+          <img 
+            src="/assets/logo.jpg" 
+            alt="Logo OkapiAI" 
+            onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+            class="w-full h-full object-contain"
+          >
+          <!-- Bespoke Geometric Okapi + Circuit + DRC Ribbon SVG Emblem -->
+          <svg style="display:none;" class="w-full h-full" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="okapiBlue" x1="0" y1="0" x2="120" y2="120" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#38bdf8"/>
+                <stop offset="55%" stop-color="#007fff"/>
+                <stop offset="100%" stop-color="#002b7f"/>
+              </linearGradient>
+              <linearGradient id="okapiGold" x1="20" y1="15" x2="80" y2="75" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#fef08a"/>
+                <stop offset="50%" stop-color="#f7d117"/>
+                <stop offset="100%" stop-color="#d97706"/>
+              </linearGradient>
+            </defs>
+            <circle cx="60" cy="62" r="46" stroke="url(#okapiBlue)" stroke-width="3" stroke-dasharray="190 35"/>
+            <circle cx="60" cy="62" r="40" stroke="#00d2ff" stroke-width="1.5" stroke-opacity="0.5"/>
+            <path d="M60 16V6M52 20V11M68 20V11M22 52H12M20 62H9M98 52H108M100 62H111" stroke="#00d2ff" stroke-width="2.2" stroke-linecap="round"/>
+            <circle cx="60" cy="5" r="3" fill="#38bdf8"/>
+            <circle cx="52" cy="10" r="2.5" fill="#00d2ff"/>
+            <circle cx="68" cy="10" r="2.5" fill="#00d2ff"/>
+            <circle cx="11" cy="52" r="2.5" fill="#38bdf8"/>
+            <circle cx="8" cy="62" r="2.5" fill="#00d2ff"/>
+            <circle cx="109" cy="52" r="2.5" fill="#38bdf8"/>
+            <circle cx="112" cy="62" r="2.5" fill="#00d2ff"/>
+            <polygon points="43,38 30,18 50,30" fill="url(#okapiGold)" stroke="#007fff" stroke-width="1.5"/>
+            <polygon points="75,38 88,18 68,30" fill="url(#okapiGold)" stroke="#007fff" stroke-width="1.5"/>
+            <polygon points="43,34 62,32 76,46 84,88 52,92 48,68 30,64 28,53" fill="url(#okapiBlue)"/>
+            <polygon points="56,34 67,44 58,64 49,54" fill="url(#okapiGold)"/>
+            <ellipse cx="47" cy="49" rx="3.2" ry="2.2" fill="#02040a"/>
+            <circle cx="46" cy="48.5" r="0.9" fill="#38bdf8"/>
+            <path d="M51 78 L78 58 L80 63 L52 83 Z" fill="#f7d117"/>
+            <path d="M52 83 L80 63 L82 69 L53 89 Z" fill="#ce1021"/>
+            <path d="M53 89 L82 69 L83 72 L54 91 Z" fill="#f7d117"/>
+            <polygon points="73,77 74.5,81 78.5,81 75.3,83.5 76.5,87.5 73,85 69.5,87.5 70.7,83.5 67.5,81 71.5,81" fill="#f7d117"/>
+          </svg>
         </div>
-        <button type="submit">Envoyer</button>
+
+        <div>
+          <div class="font-display font-black text-xl sm:text-2xl tracking-wider flex items-center gap-1.5 leading-none">
+            <span class="okapi-blue-text">OKAPI AI</span>
+          </div>
+          <!-- DRC Tricolor Accent Swoosh under Wordmark -->
+          <div class="h-1 w-32 sm:w-40 rounded-full drc-swoosh my-1.5"></div>
+          <p class="text-[11px] sm:text-xs text-slate-600 dark:text-slate-300 font-semibold tracking-wide">
+            Lingala · Swahili · Kikongo · Tshiluba
+          </p>
+        </div>
+      </div>
+
+      <!-- Theme Switcher & Account Controls -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        <button id="theme-toggle" type="button" title="Basculer Clair / Sombre" class="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-obsidian-800 dark:hover:bg-obsidian-850 border border-slate-200 dark:border-okapi-blue/30 text-slate-700 dark:text-okapi-yellow transition-all cursor-pointer">
+          <i id="theme-icon-moon" data-lucide="moon" class="w-4 h-4"></i>
+          <i id="theme-icon-sun" data-lucide="sun" class="w-4 h-4 hidden"></i>
+        </button>
+        <div id="account" class="flex items-center gap-2.5">
+          <!-- Populated dynamically via JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- NAVIGATION BAR -->
+    <div class="border-t border-slate-200/80 dark:border-okapi-blue/15 bg-white/70 dark:bg-obsidian-900/70">
+      <nav class="max-w-6xl mx-auto px-4 sm:px-6 flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-2" aria-label="Navigation principale">
+        <button data-tab="chat" class="nav-btn active flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap cursor-pointer">
+          <i data-lucide="message-square" class="w-4 h-4"></i>
+          <span>Chat & Traduction</span>
+        </button>
+        <button data-tab="voice" class="nav-btn flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap cursor-pointer">
+          <i data-lucide="mic" class="w-4 h-4"></i>
+          <span>Voix Live</span>
+        </button>
+        <button data-tab="contribute" class="nav-btn flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap cursor-pointer">
+          <i data-lucide="database" class="w-4 h-4"></i>
+          <span>Contribuer</span>
+        </button>
+        <button data-tab="learn" class="nav-btn flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap cursor-pointer">
+          <i data-lucide="graduation-cap" class="w-4 h-4"></i>
+          <span>Apprendre</span>
+        </button>
+        <button data-tab="admin" id="admin-tab" class="nav-btn flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ml-auto text-amber-700 dark:text-okapi-yellow hover:bg-amber-50 dark:hover:bg-okapi-yellow/10 cursor-pointer">
+          <i data-lucide="shield-check" class="w-4 h-4"></i>
+          <span>Admin</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT -->
+  <main class="relative z-10 flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
+
+    <!-- ==========================================
+         TAB 1: CHAT / TRADUCTION
+         ========================================== -->
+    <section id="tab-chat" class="tab-section space-y-5">
+      <!-- Top Control Bar -->
+      <div class="glass-panel rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <!-- Segmented Mode Switcher -->
+        <div class="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-obsidian-950/90 border border-slate-200 dark:border-okapi-blue/20 self-start" data-modes="chat">
+          <button type="button" data-mode="converse" class="mode-btn active flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer">
+            <i data-lucide="bot" class="w-4 h-4"></i>
+            <span>Converser</span>
+          </button>
+          <button type="button" data-mode="translate" class="mode-btn flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer">
+            <i data-lucide="languages" class="w-4 h-4"></i>
+            <span>Traduire</span>
+          </button>
+        </div>
+
+        <!-- Language Selectors -->
+        <div class="flex flex-wrap items-center gap-2.5">
+          <div class="relative">
+            <select id="chat-src" class="lang-select appearance-none bg-white dark:bg-obsidian-900 border border-slate-300 dark:border-okapi-blue/25 hover:border-okapi-blue text-slate-800 dark:text-slate-100 text-sm font-semibold rounded-xl pl-3.5 pr-9 py-2.5 focus:outline-none focus:ring-2 focus:ring-okapi-blue/30 transition-colors cursor-pointer shadow-xs"></select>
+            <i data-lucide="chevron-down" class="w-4 h-4 text-okapi-blue dark:text-okapi-cyan absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+          </div>
+
+          <button id="chat-swap" type="button" title="Inverser les langues" class="translate-only hidden p-2.5 rounded-xl bg-white dark:bg-obsidian-900 border border-slate-300 dark:border-okapi-blue/25 hover:border-okapi-blue hover:text-okapi-blue text-slate-600 dark:text-slate-300 transition-all active:scale-95 cursor-pointer shadow-xs">
+            <i data-lucide="arrow-left-right" class="w-4 h-4"></i>
+          </button>
+
+          <div class="relative translate-only hidden">
+            <select id="chat-tgt" class="lang-select appearance-none bg-white dark:bg-obsidian-900 border border-slate-300 dark:border-okapi-blue/25 hover:border-okapi-blue text-slate-800 dark:text-slate-100 text-sm font-semibold rounded-xl pl-3.5 pr-9 py-2.5 focus:outline-none focus:ring-2 focus:ring-okapi-blue/30 transition-colors cursor-pointer shadow-xs"></select>
+            <i data-lucide="chevron-down" class="w-4 h-4 text-okapi-blue dark:text-okapi-cyan absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+          </div>
+
+          <span id="ai-badge" class="converse-only inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-blue-50 dark:bg-okapi-blue/15 text-blue-700 dark:text-okapi-cyan border border-blue-200 dark:border-okapi-blue/30">
+            <span class="w-2 h-2 rounded-full bg-amber-500 dark:bg-okapi-yellow animate-pulse"></span>
+            <span id="ai-badge-text">…</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Chat Conversation Window -->
+      <div class="glass-panel rounded-2xl flex flex-col h-[540px] sm:h-[580px] overflow-hidden">
+        <!-- Messages Feed -->
+        <div id="chat-log" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-gradient-to-b from-white/40 to-slate-50/60 dark:from-transparent dark:to-transparent">
+          <!-- Initial Welcome Message -->
+          <div class="flex items-start gap-3.5 max-w-2xl">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-okapi-blue to-blue-800 border border-blue-400/50 flex items-center justify-center text-okapi-yellow font-display font-black text-xs flex-shrink-0 shadow-md">
+              AI
+            </div>
+            <div class="bg-white dark:bg-obsidian-800/90 border border-slate-200/90 dark:border-okapi-blue/20 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-slate-700 dark:text-slate-200 leading-relaxed shadow-sm">
+              <p class="font-bold text-blue-700 dark:text-okapi-yellow mb-1">Mbote ! Jambo ! Moyo ! Mbote na nge !</p>
+              <p>Bienvenue sur <strong>OkapiAI</strong>, l'intelligence artificielle dédiée aux langues de la RDC. Sélectionnez votre langue ci-dessus pour dialoguer ou traduire instantanément.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Suggestion Chips -->
+        <div class="px-4 py-2.5 border-t border-slate-200/80 dark:border-okapi-blue/15 bg-slate-50/90 dark:bg-obsidian-900/60 flex items-center gap-2 overflow-x-auto no-scrollbar">
+          <span class="text-xs text-blue-700 dark:text-okapi-cyan font-bold whitespace-nowrap">Exemples :</span>
+          <button type="button" data-lang="ln" class="quick-prompt text-xs px-3 py-1.5 rounded-lg bg-white hover:bg-blue-50 dark:bg-okapi-blue/10 dark:hover:bg-okapi-blue/20 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-okapi-blue/20 whitespace-nowrap transition-colors cursor-pointer shadow-2xs">Mbote, sango nini ?</button>
+          <button type="button" data-lang="sw" class="quick-prompt text-xs px-3 py-1.5 rounded-lg bg-white hover:bg-blue-50 dark:bg-okapi-blue/10 dark:hover:bg-okapi-blue/20 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-okapi-blue/20 whitespace-nowrap transition-colors cursor-pointer shadow-2xs">Habari ya asubuhi ?</button>
+          <button type="button" data-lang="lua" class="quick-prompt text-xs px-3 py-1.5 rounded-lg bg-white hover:bg-blue-50 dark:bg-okapi-blue/10 dark:hover:bg-okapi-blue/20 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-okapi-blue/20 whitespace-nowrap transition-colors cursor-pointer shadow-2xs">Udi bimpe ?</button>
+        </div>
+
+        <!-- Composer Input -->
+        <form id="chat-form" class="p-3 sm:p-4 bg-white dark:bg-obsidian-900/95 border-t border-slate-200 dark:border-okapi-blue/20 flex items-center gap-3">
+          <input 
+            id="chat-input" 
+            type="text"
+            placeholder="Écrivez en Lingala, Swahili, Kikongo, Tshiluba ou Français…" 
+            autocomplete="off" 
+            required
+            class="flex-1 bg-slate-50 dark:bg-obsidian-950 border border-slate-300 dark:border-okapi-blue/25 focus:border-okapi-blue rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-okapi-blue/25 transition-all"
+          >
+          <button type="submit" class="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-okapi-blue to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold text-sm shadow-md shadow-okapi-blue/25 transition-all active:scale-95 cursor-pointer">
+            <span class="hidden sm:inline">Envoyer</span>
+            <i data-lucide="send" class="w-4 h-4"></i>
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         TAB 2: VOIX LIVE
+         ========================================== -->
+    <section id="tab-voice" class="tab-section hidden space-y-6">
+      <div class="glass-panel rounded-2xl p-5 sm:p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200 dark:border-okapi-blue/15">
+          <!-- Mode Switcher -->
+          <div class="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-obsidian-950/90 border border-slate-200 dark:border-okapi-blue/20 self-start" data-modes="voice">
+            <button type="button" data-mode="converse" class="mode-btn active flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer">
+              <i data-lucide="sparkles" class="w-4 h-4"></i>
+              <span>Dialogue Vocal</span>
+            </button>
+            <button type="button" data-mode="translate" class="mode-btn flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer">
+              <i data-lucide="globe" class="w-4 h-4"></i>
+              <span>Interprète Direct</span>
+            </button>
+          </div>
+
+          <!-- Language Controls -->
+          <div class="flex flex-wrap items-center gap-3">
+            <label class="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+              <span>Je parle</span>
+              <select id="voice-src" class="lang-select bg-white dark:bg-obsidian-900 border border-slate-300 dark:border-okapi-blue/25 text-slate-800 dark:text-slate-100 text-sm font-semibold rounded-xl px-3 py-2 focus:outline-none focus:border-okapi-blue"></select>
+            </label>
+            <label class="translate-only hidden flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+              <span>Traduire en</span>
+              <select id="voice-tgt" class="lang-select bg-white dark:bg-obsidian-900 border border-slate-300 dark:border-okapi-blue/25 text-slate-800 dark:text-slate-100 text-sm font-semibold rounded-xl px-3 py-2 focus:outline-none focus:border-okapi-blue"></select>
+            </label>
+          </div>
+        </div>
+
+        <!-- Interactive Microphone Stage -->
+        <div class="py-12 sm:py-16 flex flex-col items-center justify-center text-center relative">
+          <div class="relative flex items-center justify-center">
+            <!-- Animated Ripple Rings -->
+            <span id="mic-ring-1" class="hidden absolute w-32 h-32 rounded-full bg-okapi-red/30 animate-ripple"></span>
+            <span id="mic-ring-2" class="hidden absolute w-44 h-44 rounded-full bg-okapi-yellow/35 animate-ripple" style="animation-delay: 0.4s;"></span>
+            
+            <button id="rec-btn" type="button" class="relative z-10 w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-gradient-to-b from-sky-400 via-okapi-blue to-blue-700 hover:brightness-105 text-white border-4 border-okapi-yellow shadow-xl shadow-okapi-blue/30 flex flex-col items-center justify-center gap-1.5 transition-all duration-300 active:scale-95 cursor-pointer group">
+              <i id="rec-icon" data-lucide="mic" class="w-9 h-9 text-okapi-yellow transition-transform group-hover:scale-110"></i>
+              <span id="rec-label" class="text-[11px] font-extrabold uppercase tracking-wider">Parler</span>
+            </button>
+          </div>
+
+          <p id="voice-hint" class="mt-6 text-sm font-bold text-slate-800 dark:text-slate-200">
+            Appuyez sur le microphone pour démarrer la reconnaissance vocale
+          </p>
+          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            <span id="voice-asr-info">Transcription automatique : swahili, lingala et français. En kikongo et en tshiluba, vous tapez ce que vous avez dit.</span>
+          </p>
+        </div>
+
+        <!-- Voice Transcription Log -->
+        <div class="border-t border-slate-200 dark:border-okapi-blue/15 pt-5">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-okapi-cyan mb-3 flex items-center gap-2">
+            <i data-lucide="audio-waveform" class="w-4 h-4 text-amber-500 dark:text-okapi-yellow"></i>
+            Transcription & Synthèse vocale
+          </h3>
+          <div id="voice-log" class="space-y-3 max-h-64 overflow-y-auto pr-1">
+            <div class="text-center py-6 text-xs text-slate-400 dark:text-slate-500 border border-dashed border-slate-300 dark:border-okapi-blue/25 rounded-xl bg-slate-50/50 dark:bg-transparent">
+              Aucune session vocale enregistrée pour le moment.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         TAB 3: CONTRIBUER AU DATASET
+         ========================================== -->
+    <section id="tab-contribute" class="tab-section hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Left Column: Submission Form -->
+        <div class="lg:col-span-7 glass-panel rounded-2xl p-5 sm:p-6 space-y-5">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <h2 class="font-display font-bold text-lg sm:text-xl text-slate-900 dark:text-white">Enrichir le Corpus National</h2>
+              <p class="mt-1 text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                Une entrée intègre le modèle dès que <strong class="text-amber-600 dark:text-okapi-yellow">10 personnes différentes</strong> l'ont proposée, puis qu'un administrateur l'a validée.
+              </p>
+            </div>
+            <span class="px-2.5 py-1 rounded-lg bg-amber-100 dark:bg-okapi-yellow/15 border border-amber-300 dark:border-okapi-yellow/30 text-amber-800 dark:text-okapi-yellow text-xs font-bold whitespace-nowrap">
+              <span class="min-similar">10</span> personnes + admin
+            </span>
+          </div>
+
+          <!-- Contribution Mode Switcher -->
+          <div class="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-obsidian-950/90 border border-slate-200 dark:border-okapi-blue/20" data-modes="contrib">
+            <button type="button" data-mode="translate" class="mode-btn active flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer">
+              <i data-lucide="repeat" class="w-4 h-4"></i>
+              <span>Paire de Traduction</span>
+            </button>
+            <button type="button" data-mode="converse" class="mode-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer">
+              <i data-lucide="message-circle-plus" class="w-4 h-4"></i>
+              <span>Dialogue IA</span>
+            </button>
+          </div>
+
+          <form id="contrib-form" class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Langue source</label>
+                <select name="source_lang" class="lang-select w-full bg-white dark:bg-obsidian-900 border border-slate-300 dark:border-okapi-blue/25 rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:border-okapi-blue"></select>
+              </div>
+              <div class="translate-only">
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Langue cible</label>
+                <select name="target_lang" class="lang-select w-full bg-white dark:bg-obsidian-900 border border-slate-300 dark:border-okapi-blue/25 rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:border-okapi-blue"></select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                <span class="translate-only">Phrase originale</span>
+                <span class="converse-only hidden">Question / Invite utilisateur</span>
+              </label>
+              <input name="source_text" type="text" required placeholder="Ex: Boni, ozali malamu ?" class="w-full bg-white dark:bg-obsidian-900 border border-slate-300 dark:border-okapi-blue/25 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-okapi-blue">
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                <span class="translate-only">Traduction exacte</span>
+                <span class="converse-only hidden">Réponse idéale du bot</span>
+              </label>
+              <input name="target_text" type="text" required placeholder="Ex: Bonjour, comment vas-tu ?" class="w-full bg-white dark:bg-obsidian-900 border border-slate-300 dark:border-okapi-blue/25 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-okapi-blue">
+            </div>
+
+            <!-- Optional Audio Recorder -->
+            <div class="p-3.5 rounded-xl bg-slate-100/80 dark:bg-obsidian-900/80 border border-slate-200 dark:border-okapi-blue/15 flex flex-wrap items-center justify-between gap-3">
+              <div class="flex items-center gap-2.5">
+                <button type="button" id="contrib-rec-btn" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-white hover:bg-blue-50 dark:bg-okapi-blue/15 dark:hover:bg-okapi-blue/25 text-xs font-semibold text-slate-800 dark:text-slate-100 border border-slate-300 dark:border-okapi-blue/30 transition-colors cursor-pointer shadow-2xs">
+                  <i data-lucide="mic" class="w-3.5 h-3.5 text-okapi-red"></i>
+                  <span>Enregistrer la prononciation</span>
+                </button>
+                <span id="contrib-rec-status" class="text-xs text-slate-500 dark:text-slate-400">Optionnel (TTS / ASR)</span>
+              </div>
+              <audio id="contrib-audio" controls class="hidden h-8 max-w-[200px]"></audio>
+            </div>
+
+            <button type="submit" class="w-full py-3 px-5 rounded-xl bg-gradient-to-r from-okapi-blue to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold text-sm shadow-md shadow-okapi-blue/25 transition-all active:scale-[0.99] cursor-pointer">
+              Soumettre au corpus communautaire
+            </button>
+          </form>
+        </div>
+
+        <!-- Right Column: Community Verification & User History -->
+        <div class="lg:col-span-5 space-y-6">
+          <!-- Community Validation Queue -->
+          <div class="glass-panel rounded-2xl p-5 sm:p-6 space-y-4">
+            <div class="flex items-center justify-between gap-2">
+              <div>
+                <h3 class="font-display font-bold text-base text-slate-900 dark:text-white">Validation Communautaire</h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Confirmez les traductions proposées</p>
+              </div>
+              <select id="prop-filter" class="bg-white dark:bg-obsidian-900 border border-slate-300 dark:border-okapi-blue/25 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none">
+                <option value="">Toutes</option>
+                <option value="ln">Lingala</option>
+                <option value="sw">Swahili</option>
+                <option value="kg">Kikongo</option>
+                <option value="lua">Tshiluba</option>
+              </select>
+            </div>
+
+            <div id="proposals" class="space-y-3 max-h-80 overflow-y-auto pr-1">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <!-- My Contributions -->
+          <div class="glass-panel rounded-2xl p-5 sm:p-6 space-y-3">
+            <h3 class="font-display font-bold text-base text-slate-900 dark:text-white flex items-center justify-between">
+              <span>Mes contributions récentes</span>
+              <span id="mine-count" class="text-xs font-sans font-bold px-2.5 py-0.5 rounded-full bg-blue-100 dark:bg-okapi-blue/20 text-blue-700 dark:text-okapi-cyan">0</span>
+            </h3>
+            <div id="mine" class="space-y-2.5 max-h-48 overflow-y-auto pr-1">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         TAB 4: APPRENDRE (FLASHCARDS & QUIZ)
+         ========================================== -->
+    <section id="tab-learn" class="tab-section hidden space-y-6">
+      <!-- Top Controls -->
+      <div class="glass-panel rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-blue-100 dark:bg-okapi-blue/15 border border-blue-200 dark:border-okapi-blue/30 flex items-center justify-center text-okapi-blue dark:text-okapi-cyan">
+            <i data-lucide="book-open" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <label for="learn-lang" class="block text-xs text-slate-500 dark:text-slate-400 font-semibold">Langue étudiée</label>
+            <select id="learn-lang" class="bg-transparent text-slate-900 dark:text-white font-display font-bold text-base focus:outline-none cursor-pointer">
+              <option value="ln" class="bg-white dark:bg-obsidian-900">Lingala</option>
+              <option value="sw" class="bg-white dark:bg-obsidian-900">Swahili</option>
+              <option value="kg" class="bg-white dark:bg-obsidian-900">Kikongo</option>
+              <option value="lua" class="bg-white dark:bg-obsidian-900">Tshiluba</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button id="learn-cards-btn" type="button" class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-okapi-blue text-white font-semibold text-sm shadow-md shadow-okapi-blue/25 transition-all cursor-pointer">
+            <i data-lucide="layers" class="w-4 h-4"></i>
+            <span>Cartes Mémoire</span>
+          </button>
+          <button id="learn-quiz-btn" type="button" class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-slate-100 dark:bg-obsidian-900 dark:hover:bg-obsidian-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-okapi-blue/25 font-semibold text-sm transition-all cursor-pointer">
+            <i data-lucide="help-circle" class="w-4 h-4"></i>
+            <span>Quiz Rapide</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Interactive Learning Arena -->
+      <div id="learn-area" class="glass-panel rounded-2xl p-6 sm:p-10 min-h-[380px] flex flex-col items-center justify-center">
+        <!-- Populated dynamically via JS -->
+      </div>
+    </section>
+
+    <!-- ==========================================
+         TAB 5: ADMIN & DATASET CURATION
+         ========================================== -->
+    <section id="tab-admin" class="tab-section hidden space-y-6">
+      <!-- KPI Stat Cards -->
+      <div id="admin-stats" class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Populated dynamically -->
+      </div>
+
+      <!-- Filter & Export Toolbar -->
+      <div class="glass-panel rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <label for="admin-status" class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Statut :</label>
+          <select id="admin-status" class="bg-white dark:bg-obsidian-900 border border-slate-300 dark:border-okapi-blue/25 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-800 dark:text-white focus:outline-none focus:border-okapi-blue">
+            <option value="en_attente_admin">En attente de validation (≥10 votes)</option>
+            <option value="collecte">En collecte (&lt; 10 votes)</option>
+            <option value="approuve">Approuvées (Dans le corpus)</option>
+            <option value="rejete">Rejetées</option>
+          </select>
+        </div>
+
+        <button id="admin-export" type="button" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-100 hover:bg-amber-200 dark:bg-okapi-yellow/15 dark:hover:bg-okapi-yellow/25 text-amber-900 dark:text-okapi-yellow border border-amber-300 dark:border-okapi-yellow/35 text-sm font-bold transition-all cursor-pointer">
+          <i data-lucide="download" class="w-4 h-4"></i>
+          <span>Exporter le Dataset (JSONL)</span>
+        </button>
+      </div>
+
+      <!-- Moderation List -->
+      <div id="admin-list" class="space-y-3">
+        <!-- Populated dynamically -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="relative z-10 border-t border-slate-200 dark:border-okapi-blue/15 py-6 mt-12 bg-white/70 dark:bg-black/50">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 dark:text-slate-400">
+      <div class="flex items-center gap-2.5">
+        <span class="font-display font-black text-okapi-blue dark:text-okapi-cyan tracking-wide">OKAPI AI</span>
+        <span class="w-6 h-1 rounded-full drc-swoosh inline-block"></span>
+        <span>Souveraineté numérique et IA des langues nationales de la RDC.</span>
+      </div>
+      <div class="flex items-center gap-4">
+        <span>Données validées par la communauté</span>
+        <span>•</span>
+        <span id="api-status" class="text-slate-500 flex items-center gap-1.5 font-semibold">
+          <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+          Connexion à l'API…
+        </span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- LOGIN / REGISTER MODAL DIALOG -->
+  <dialog id="login-dialog" class="backdrop:bg-slate-900/60 dark:backdrop:bg-black/85 backdrop:backdrop-blur-sm bg-transparent p-4 w-full max-w-md rounded-2xl">
+    <div class="glass-panel rounded-2xl p-6 sm:p-7 border border-slate-200 dark:border-okapi-blue/30 text-slate-800 dark:text-slate-100">
+      <div class="flex items-center justify-between mb-5">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-blue-100 dark:bg-okapi-blue/20 border border-blue-200 dark:border-okapi-blue/40 flex items-center justify-center text-okapi-blue dark:text-okapi-yellow">
+            <i data-lucide="user-check" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h2 class="font-display font-bold text-lg text-slate-900 dark:text-white">Espace Contributeur</h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Connectez-vous pour contribuer et confirmer les propositions</p>
+          </div>
+        </div>
+        <button type="button" id="close-login-btn" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="login-form" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Nom d'utilisateur</label>
+          <input name="username" type="text" placeholder="Ex: KinshasaDev" required minlength="3" class="w-full bg-slate-50 dark:bg-obsidian-950 border border-slate-300 dark:border-okapi-blue/25 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-okapi-blue">
+        </div>
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Mot de passe</label>
+          <input name="password" type="password" placeholder="••••••••" required minlength="6" class="w-full bg-slate-50 dark:bg-obsidian-950 border border-slate-300 dark:border-okapi-blue/25 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-okapi-blue">
+        </div>
+        
+        <p id="login-msg" class="text-xs text-okapi-red min-h-[16px]"></p>
+
+        <div class="grid grid-cols-2 gap-3 pt-1">
+          <button type="submit" data-action="login" class="py-2.5 px-4 rounded-xl bg-gradient-to-r from-okapi-blue to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold text-sm shadow-md shadow-okapi-blue/25 transition-all cursor-pointer">
+            Se connecter
+          </button>
+          <button type="submit" data-action="register" class="py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-800 dark:text-white border border-slate-300 dark:border-okapi-blue/25 font-semibold text-sm transition-all cursor-pointer">
+            Créer un compte
+          </button>
+        </div>
       </form>
-      <p id="contrib-msg" class="msg"></p>
     </div>
+  </dialog>
 
-    <div class="card">
-      <h2>Confirmer les propositions des autres</h2>
-      <p class="muted">Vous connaissez ces traductions ? Confirmez-les pour les aider à atteindre le seuil.</p>
-      <label>Filtrer <select id="prop-filter"><option value="">Toutes les langues</option></select></label>
-      <div id="proposals"></div>
-    </div>
-
-    <div class="card">
-      <h2>Mes contributions</h2>
-      <div id="mine"></div>
-    </div>
-  </section>
-
-  <!-- APPRENDRE -->
-  <section id="tab-learn" class="tab">
-    <div class="langbar">
-      <label>J'apprends <select id="learn-lang"></select></label>
-      <button id="learn-cards-btn">Cartes</button>
-      <button id="learn-quiz-btn">Quiz</button>
-    </div>
-    <div id="learn-area" class="card"></div>
-  </section>
-
-  <!-- ADMIN -->
-  <section id="tab-admin" class="tab">
-    <div id="admin-stats" class="stats"></div>
-    <div class="langbar">
-      <label>Afficher <select id="admin-status">
-        <option value="en_attente_admin">En attente de validation</option>
-        <option value="collecte">En collecte (&lt; seuil)</option>
-        <option value="approuve">Approuvées</option>
-        <option value="rejete">Rejetées</option>
-      </select></label>
-      <button id="admin-export">⬇️ Exporter le dataset d'entraînement</button>
-    </div>
-    <div id="admin-list"></div>
-  </section>
-</main>
-
-<dialog id="login-dialog">
-  <form id="login-form" method="dialog">
-    <h2>Connexion</h2>
-    <input name="username" placeholder="Nom d'utilisateur" required minlength="3">
-    <input name="password" type="password" placeholder="Mot de passe" required minlength="6">
-    <p id="login-msg" class="msg"></p>
-    <div class="row">
-      <button value="login">Se connecter</button>
-      <button value="register" class="secondary">Créer un compte</button>
-      <button value="cancel" class="secondary" formnovalidate>Annuler</button>
-    </div>
-  </form>
-</dialog>
-
-<script src="/app.js?v=5"></script>
+  <!-- APPLICATION : logique reliée à l'API OkapiAI -->
+  <script src="/app.js?v=6"></script>
 </body>
 </html>

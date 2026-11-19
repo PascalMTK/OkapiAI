@@ -209,11 +209,11 @@ OkapiAI/
 │   │       └── speech.py        # Reconnaissance vocale (faster-whisper), optionnelle
 │   ├── training/                # Export du dataset et fine-tuning
 │   └── tests/
-├── frontend/                    # Interface web (HTML · CSS · JavaScript)
+├── frontend/                    # Interface web (HTML · Tailwind · JavaScript)
 └── docs/
 ```
 
-**Stack :** FastAPI · SQLAlchemy 2 · SQLite / PostgreSQL · JavaScript sans framework · Hugging Face Transformers · Anthropic SDK · faster-whisper
+**Stack :** FastAPI · SQLAlchemy 2 · SQLite / PostgreSQL · Tailwind CSS · Lucide · JavaScript · Hugging Face Transformers · Anthropic SDK · faster-whisper
 
 ## 🧪 Tests
 
