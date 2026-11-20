@@ -646,7 +646,10 @@ async function liveSend(pcm) {
       json: { lang, message: r.transcript.slice(0, 1000), history: live.history.slice(-20), voice: true } });
     if (live.request !== ctrl) return;
     live.request = null; live.carry = null;   // réponse reçue : la phrase est close
-    liveLog("user", r.transcript, null, live.lang === "auto" ? lang : null);
+    // Prononciation approximative comprise quand même : on montre aussi ce qui a été entendu,
+    // pour que l'apprenant voie la bonne forme
+    liveLog("user", r.transcript, null, live.lang === "auto" ? lang : null,
+      r.fixes?.length ? `entendu : « ${r.heard} »` : null);
     if (!a?.reply) {
       liveCaption(r.transcript, a?.hint || "Je ne sais pas encore répondre à ça.", "");
       liveLog("bot", a?.hint || "Je ne sais pas encore répondre.");

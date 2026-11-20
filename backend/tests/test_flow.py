@@ -382,7 +382,22 @@ def test_free_ai_relay():
     assert llm.parse_reply('{"reply": ') is None
 
 
+def test_learner_hearing():
+    """Un apprenant qui prononce mal est compris ; une phrase correcte n'est pas modifiée."""
+    from app.services.hearing import hearing
+    fixed = {"bote ozali maramu": "mbote ozali malamu", "nazali na njala": "nazali na nzala",
+             "kinchasa ezali kitoko": "kinshasa ezali kitoko", "matondo mingui": "matondo mingi",
+             "limbissa ngai": "limbisa ngai"}
+    for heard, meant in fixed.items():
+        assert hearing.correct(heard)["text"] == meant, (heard, hearing.correct(heard))
+    for ok in ("tolei malamu", "nakolia fufu na madesu", "alingaki ngai", "nazali koyekola na universite",
+               "olingi tosolola likambo nini lelo"):
+        r = hearing.correct(ok)
+        assert r["text"] == ok and not r["fixes"], (ok, r)
+
+
 if __name__ == "__main__":
+    test_learner_hearing()
     test_free_ai_relay()
     test_full_flow()
     test_voice_contribution_and_audio_access()

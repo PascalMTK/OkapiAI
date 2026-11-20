@@ -13,11 +13,24 @@ from ..schemas import ChatTurn, ConverseIn, TranslateIn, check_langs
 from ..services import conversation, translator
 from ..services.audio import save_audio
 from ..services.corpus import corpus
+from ..services.hearing import hearing
 from ..services.speech import recognizer
 from ..services.tts import MAX_CHARS, synthesizer
 
 router = APIRouter(prefix="/api", tags=["chat"])
 AUTO = "auto"  # voix live : détecter la langue nationale parlée
+
+
+def _understand(transcript, lang: str) -> dict:
+    """Écoute tolérante (lingala) : la phrase comprise, plus ce qui a été réellement entendu
+    (`heard`) et les mots rapprochés (`fixes`), pour montrer la bonne forme à l'apprenant."""
+    if not transcript or lang != "ln":
+        return {"transcript": transcript, "heard": transcript, "fixes": []}
+    try:
+        r = hearing.correct(transcript)
+        return {"transcript": r["text"], "heard": r["heard"], "fixes": r["fixes"]}
+    except Exception:  # jamais bloquant : on garde ce qui a été entendu
+        return {"transcript": transcript, "heard": transcript, "fixes": []}
 
 
 @router.get("/languages")
@@ -123,8 +136,9 @@ async def voice_chat(
     """
     check_langs(source_lang, target_lang, require_congolese=False)
     name = await save_audio(audio)
-    transcript = recognizer.transcribe(AUDIO_DIR / name, source_lang)
-    out = {"audio_file": name, "transcript": transcript,
+    heard = _understand(recognizer.transcribe(AUDIO_DIR / name, source_lang), source_lang)
+    transcript = heard["transcript"]
+    out = {"audio_file": name, **heard,
            "asr_available": recognizer.supports(source_lang), "translation": None}
     if transcript:
         out["translation"] = translator.translate(db, transcript, source_lang, target_lang)
@@ -186,7 +200,7 @@ async def _transcribe(audio: UploadFile, lang: str) -> dict:
         asr = bool(recognizer.auto_langs())
     else:
         transcript, asr = recognizer.transcribe(AUDIO_DIR / name, lang), recognizer.supports(lang)
-    return {"audio_file": name, "transcript": transcript, "lang": lang, "asr_available": asr, "answer": None}
+    return {"audio_file": name, **_understand(transcript, lang), "lang": lang, "asr_available": asr, "answer": None}
 
 
 @router.post("/voice/transcribe")
