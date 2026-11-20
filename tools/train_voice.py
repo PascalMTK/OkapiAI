@@ -171,7 +171,9 @@ def train(speaker: str, epochs: int, batch: int, resume: bool = False, lr: float
 
     ckpt, cfg_path = base_files()
     if resume:  # repart du meilleur modèle déjà affiné sur ce locuteur, au lieu de la voix Open Bible
-        ckpt = str(latest_run(speaker) / "best_model.pth")
+        run = latest_run(speaker)
+        saved = sorted(run.glob("checkpoint_*.pth"), key=lambda p: int(p.stem.split("_")[1]))
+        ckpt = str(run / "best_model.pth" if (run / "best_model.pth").exists() else saved[-1])
         print(f"Reprise depuis {ckpt}", flush=True)
     data = out_dir(speaker) / "data"
     config = VitsConfig()

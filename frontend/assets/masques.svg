@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+<!-- Masques congolais stylisés, dessins originaux d'OkapiAI inspirés des traditions songye (kifwebe), kuba, pende, luba et lega. -->
+<symbol id="masque-songye" viewBox="0 0 160 260">
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M80 8 C122 14 142 62 140 124 C138 186 118 236 80 252 C42 236 22 186 20 124 C18 62 38 14 80 8Z"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="5" d="M80 8 L80 150"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M33.0 44 Q59.5 32 74 40"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M86 40 Q100.5 32 127.0 44"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M30.799999999999997 62 Q58.4 50 74 58"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M86 58 Q101.6 50 129.2 62"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M28.6 80 Q57.3 68 74 76"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M86 76 Q102.7 68 131.4 80"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M26.4 98 Q56.2 86 74 94"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M86 94 Q103.8 86 133.6 98"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M24.200000000000003 152 Q55.1 140 74 148"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M86 148 Q104.9 140 135.8 152"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M26.4 170 Q56.2 158 74 166"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M86 166 Q103.8 158 133.6 170"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M28.6 188 Q57.3 176 74 184"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M86 184 Q102.7 176 131.4 188"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M30.799999999999997 206 Q58.4 194 74 202"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M86 202 Q101.6 194 129.2 206"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M33.0 224 Q59.5 212 74 220"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M86 220 Q100.5 212 127.0 224"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M42 110 Q56 96 72 110 Q56 120 42 110Z"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M88 110 Q104 96 118 110 Q104 120 88 110Z"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M80 128 L72 168 L88 168Z"/>
+<rect fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" x="62" y="186" width="36" height="22" rx="4"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M62 197 L98 197"/>
+</symbol>
+<symbol id="masque-kuba" viewBox="0 0 160 240">
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M80 20 C130 20 150 70 148 120 C146 180 118 226 80 232 C42 226 14 180 12 120 C10 70 30 20 80 20Z"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M18 74 L142 74 M16 96 L144 96"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.0 96 L26.2 76 L32.4 96"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M32.4 96 L38.6 76 L44.8 96"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M44.8 96 L51.0 76 L57.2 96"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M57.2 96 L63.4 76 L69.6 96"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M69.6 96 L75.8 76 L82.0 96"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M82.0 96 L88.2 76 L94.4 96"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M94.4 96 L100.6 76 L106.8 96"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M106.8 96 L113.0 76 L119.2 96"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M119.2 96 L125.4 76 L131.6 96"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M131.6 96 L137.8 76 L144.0 96"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M38 124 Q54 110 70 124 Q54 134 38 124Z"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M90 124 Q106 110 122 124 Q106 134 90 124Z"/>
+<circle fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" cx="80" cy="104" r="3.2"/>
+<circle fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" cx="80" cy="115" r="3.2"/>
+<circle fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" cx="80" cy="126" r="3.2"/>
+<circle fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" cx="80" cy="137" r="3.2"/>
+<circle fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" cx="80" cy="148" r="3.2"/>
+<circle fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" cx="80" cy="159" r="3.2"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M60 192 Q80 206 100 192"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M30 150 L44 166 M130 150 L116 166"/>
+<ellipse fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" cx="36" cy="40" rx="5" ry="8"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M36 34 L36 46"/>
+<ellipse fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" cx="52" cy="40" rx="5" ry="8"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M52 34 L52 46"/>
+<ellipse fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" cx="108" cy="40" rx="5" ry="8"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M108 34 L108 46"/>
+<ellipse fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" cx="124" cy="40" rx="5" ry="8"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M124 34 L124 46"/>
+</symbol>
+<symbol id="masque-pende" viewBox="0 0 160 260">
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M22 70 C26 26 134 26 138 70 C142 120 128 170 112 196 L48 196 C32 170 18 120 22 70Z"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3.5" d="M30 92 Q55 70 80 92 Q105 70 130 92"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M38 112 Q55 100 72 112 M88 112 Q105 100 122 112"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M42 113 Q55 122 68 113 M92 113 Q105 122 118 113"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M80 96 L68 150 L92 150Z"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M60 170 Q80 182 100 170 Q80 162 60 170Z"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M50 198 L45.2 232"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M55 198 L51.0 235"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M60 198 L56.8 238"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M65 198 L62.6 241"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M70 198 L68.4 244"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M75 198 L74.2 247"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M80 198 L80.0 250"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M85 198 L85.8 247"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M90 198 L91.6 244"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M95 198 L97.4 241"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M100 198 L103.2 238"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M105 198 L109.0 235"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M110 198 L114.8 232"/>
+</symbol>
+<symbol id="masque-luba" viewBox="0 0 160 230">
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M80 70 C116 70 132 104 130 140 C128 184 106 214 80 218 C54 214 32 184 30 140 C28 104 44 70 80 70Z"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M80 70 C60 40 40 40 34 58 C30 70 44 76 56 74 M80 70 C100 40 120 40 126 58 C130 70 116 76 104 74"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M80 70 C70 30 74 12 80 8 C86 12 90 30 80 70"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M48 138 Q60 130 72 138 M88 138 Q100 130 112 138"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M80 132 L80 166 Q74 170 72 168 M80 166 Q86 170 88 168"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M68 186 Q80 192 92 186"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M40 160 l6 -3 M120 160 l-6 -3"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M44 166 l6 -3 M116 166 l-6 -3"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M48 172 l6 -3 M112 172 l-6 -3"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M52 178 l6 -3 M108 178 l-6 -3"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M56 184 l6 -3 M104 184 l-6 -3"/>
+</symbol>
+<symbol id="masque-lega" viewBox="0 0 160 210">
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M80 58 C64 30 26 36 26 76 C26 126 56 170 80 196 C104 170 134 126 134 76 C134 36 96 30 80 58Z"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M80 66 C68 48 40 52 40 80 C40 118 62 152 80 174 C98 152 120 118 120 80 C120 52 92 48 80 66Z"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M50 96 L68 98 M92 98 L110 96"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M80 82 L80 136"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M70 150 L90 150"/>
+<circle fill="currentColor" cx="18.0" cy="165.7" r="2.6"/>
+<circle fill="currentColor" cx="27.6" cy="178.0" r="2.6"/>
+<circle fill="currentColor" cx="42.1" cy="187.7" r="2.6"/>
+<circle fill="currentColor" cx="60.2" cy="193.9" r="2.6"/>
+<circle fill="currentColor" cx="80.0" cy="196.0" r="2.6"/>
+<circle fill="currentColor" cx="99.8" cy="193.9" r="2.6"/>
+<circle fill="currentColor" cx="117.9" cy="187.7" r="2.6"/>
+<circle fill="currentColor" cx="132.4" cy="178.0" r="2.6"/>
+<circle fill="currentColor" cx="142.0" cy="165.7" r="2.6"/>
+</symbol>
+<symbol id="motif-kuba" viewBox="0 0 48 48">
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.4" d="M0 24 L12 12 L24 24 L36 12 L48 24 M0 24 L12 36 L24 24 L36 36 L48 24"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.4" d="M12 0 L12 6 M36 0 L36 6 M12 42 L12 48 M36 42 L36 48 M20 24 L28 24"/>
+</symbol>
+</svg>
