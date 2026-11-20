@@ -4,6 +4,7 @@ Usage (avec un Python où `coqui-tts` est installé, voir le README) :
   python tools/train_voice.py prepare --speaker florent     # prépare les données
   python tools/train_voice.py train   --speaker florent     # affinage (plusieurs heures, GPU conseillé)
   python tools/train_voice.py sample  --speaker florent     # génère des phrases de test
+  python tools/train_voice.py train   --speaker florent --resume --lr 2e-5 --epochs 80   # reprise
 
 Données  : dataset/sources/lrsc/  (CC BY 4.0) -> backend/models/voix-<speaker>/data/
            wavs/<id>.wav (22 050 Hz mono, silences coupés) + metadata.csv (format LJSpeech)
@@ -91,7 +92,7 @@ def base_files():
     return hf_hub_download(BASE_REPO, "model_last.pth"), hf_hub_download(BASE_REPO, "config.json")
 
 
-def train(speaker: str, epochs: int, batch: int) -> None:
+def train(speaker: str, epochs: int, batch: int, resume: bool = False, lr: float = 5e-5) -> None:
     from trainer import Trainer, TrainerArgs
     from TTS.config.shared_configs import BaseDatasetConfig
     from TTS.tts.configs.vits_config import VitsConfig
@@ -99,6 +100,9 @@ def train(speaker: str, epochs: int, batch: int) -> None:
     from TTS.tts.models.vits import Vits
 
     ckpt, cfg_path = base_files()
+    if resume:  # repart du meilleur modèle déjà affiné sur ce locuteur, au lieu de la voix Open Bible
+        ckpt = str(latest_run(speaker) / "best_model.pth")
+        print(f"Reprise depuis {ckpt}", flush=True)
     data = out_dir(speaker) / "data"
     config = VitsConfig()
     config.load_json(cfg_path)
@@ -108,7 +112,7 @@ def train(speaker: str, epochs: int, batch: int) -> None:
     config.run_name = f"run-{speaker}"
     config.batch_size, config.eval_batch_size = batch, batch
     config.epochs = epochs
-    config.lr_gen = config.lr_disc = 5e-5          # affinage : pas trop fort pour ne pas tout oublier
+    config.lr_gen = config.lr_disc = lr            # affinage : pas trop fort pour ne pas tout oublier
     config.run_eval = True
     config.test_delay_epochs = 0
     config.test_sentences = [[s] for s in TEST_SENTENCES]
@@ -164,6 +168,9 @@ if __name__ == "__main__":
     ap.add_argument("--speaker", default="florent")
     ap.add_argument("--epochs", type=int, default=120)
     ap.add_argument("--batch", type=int, default=8)
+    ap.add_argument("--resume", action="store_true", help="repartir du meilleur modèle du dernier entraînement")
+    ap.add_argument("--lr", type=float, default=5e-5, help="taux d'apprentissage (plus bas pour une reprise)")
     a = ap.parse_args()
-    {"prepare": lambda: prepare(a.speaker), "train": lambda: train(a.speaker, a.epochs, a.batch),
+    {"prepare": lambda: prepare(a.speaker),
+     "train": lambda: train(a.speaker, a.epochs, a.batch, a.resume, a.lr),
      "sample": lambda: sample(a.speaker)}[a.step]()

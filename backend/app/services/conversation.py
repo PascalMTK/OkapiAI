@@ -31,6 +31,7 @@ MAX_EXAMPLES = 25
 
 # ---------- Questions « que veut dire … ? » ----------
 _T = r"(?P<t>[\w' -]{1,60}?)"
+_NATL = r"(?:lingala|kiswahili|swahili|kikongo|tshiluba|ciluba)"
 _MEANING = [re.compile(p) for p in (
     rf"^(?:que|qu'est ce que|qu est ce que|qu'est-ce que|ca|sa)?\s*(?:veut dire|veux dire|signifie)\s+{_T}$",
     rf"^(?:que|qu'est ce que|qu est ce que|qu'est-ce que)\s+{_T}\s+(?:veut dire|signifie)$",
@@ -49,6 +50,13 @@ _REVERSE = [re.compile(p) for p in (
     rf"(?:\s+en\s+(?:lingala|swahili|kikongo|tshiluba))?$",
     rf"^(?:traduis|traduire|traduction de|traduction du)\s+{_T}\s+en\s+(?:lingala|swahili|kikongo|tshiluba)$",
     rf"^(?:how do you say|how to say)\s+{_T}(?:\s+in\s+\w+)?$",
+    # en lingala : « ndenge nini nakoloba merci na lingala ? », « ndenge nini balobaka … ? »
+    rf"^ndenge nini\s+\w*(?:loba|lobaka|benga|bengaka|koma)\s+{_T}(?:\s+na\s+{_NATL})?$",
+    rf"^(?:loba|lobela ngai|yebisa ngai)\s+{_T}\s+na\s+{_NATL}$",
+    # « merci en lingala c'est quoi ? », « merci na lingala ezali nini ? »
+    rf"^{_T}\s+(?:en|na)\s+{_NATL}\s+(?:c'est quoi|c est quoi|cest quoi|ca se dit comment|se dit comment|"
+    rf"on dit comment|comment|ezali nini|ezali ndenge nini|balobaka ndenge nini|elobami ndenge nini|nini|boni)$",
+    rf"^(?:dis moi|dis-moi|donne moi|donne-moi)\s+{_T}\s+en\s+{_NATL}$",
 )]
 _STRIP = re.compile(r"^(?:le mot|le terme|l'expression|la phrase|liloba|mot|neno|le|la|les|l')\s+|"
                     r"\s+(?:en lingala|en francais|na lingala|na lifalanse|en swahili|kwa kiswahili)$")
@@ -56,8 +64,8 @@ _STRIP = re.compile(r"^(?:le mot|le terme|l'expression|la phrase|liloba|mot|neno
 
 def parse_word_question(message: str) -> Optional[tuple[str, str]]:
     """('sens', mot) pour « que veut dire X », ('traduire', mot) pour « comment dit-on X »."""
-    k = key(message.replace("?", " "))
-    for kind, patterns in (("sens", _MEANING), ("traduire", _REVERSE)):
+    k = " ".join(key(re.sub(r"[?!.,«»\"“”]", " ", message)).split())
+    for kind, patterns in (("traduire", _REVERSE), ("sens", _MEANING)):
         for p in patterns:
             m = p.match(k)
             if m:
@@ -130,6 +138,9 @@ def answer_word_question(db: Session, lang: str, kind: str, term: str, history: 
                        audio_url=t.get("audio_url") if t["method"] == "dataset" else None,
                        word={"term": term, "translations": words[:4]})
             return out
+        # « ndako na lingala ezali nini ? » : le mot est déjà du lingala -> on donne son sens
+        if lang == "ln" and lexicon.lookup(term, fuzzy=False)[1]:
+            return answer_word_question(db, lang, "sens", term, history)
     # 3. IA (si configurée), sinon : « je ne connais pas encore ce mot »
     question = f"Que veut dire « {term} » ?" if kind == "sens" else f"Comment dit-on « {term} » en {LANGUAGES[lang]} ?"
     hints = lexicon.examples_for(term) + corpus.examples_for_ai(term, k=4) if lang == "ln" else []

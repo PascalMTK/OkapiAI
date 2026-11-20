@@ -223,6 +223,18 @@ def test_word_meaning():
         r = ask("Comment dit-on maison en lingala ?")
         assert r["method"] == "lexique" and "ndáko" in r["reply"] and r["reply"].startswith("Na lingala")
 
+        # « comment dit-on merci », aussi demandé en lingala : l'usage courant (matondo), pas l'emprunt rare
+        for q in ("Ndenge nini nakoloba 'merci' na lingala?", "merci en lingala c'est quoi ?"):
+            r = ask(q)
+            assert r["method"] == "lexique" and "matɔ́ndɔ" in r["reply"], r
+        r = ask("ndako na lingala ezali nini ?")  # déjà du lingala : on donne son sens
+        assert r["method"] == "lexique" and "maison" in r["reply"], r
+
+        # une longue conversation (plus de 20 tours, une ancienne réponse très longue) ne doit pas échouer
+        long_history = [{"role": "user" if i % 2 == 0 else "assistant", "text": "mbote " * 300} for i in range(30)]
+        r = c.post("/api/converse", json={"lang": "ln", "message": "Okei wapi?", "history": long_history})
+        assert r.status_code == 200 and "kokende wapi" in r.json()["reply"], r.text
+
         r = ask("Que veut dire xqzwv ?")  # mot inconnu : réponse en lingala, pas d'invention
         assert r["method"] == "inconnu" and r["reply"].startswith("Nayebi naino")
 

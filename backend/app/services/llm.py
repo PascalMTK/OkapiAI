@@ -39,6 +39,8 @@ LANG_DETAILS = {
 SYSTEM_TEMPLATE = """Tu es OkapiAI, un assistant conversationnel congolais. Tu converses avec l'utilisateur en {lang_details}.
 
 Règles :
+- Avant de répondre, comprends exactement ce que dit l'utilisateur (écris-le en français dans « compris »), puis réponds DIRECTEMENT à ce message : s'il te pose une question (« bongo yo ? », « yo ? », « okei wapi ? »), réponds d'abord à cette question ; ne change pas de sujet.
+- Tu es un assistant (tu ne manges pas, tu ne te déplaces pas) : réponds avec naturel et humour à ce genre de question, puis renvoie la question à l'utilisateur.
 - Réponds TOUJOURS dans cette langue, même si l'utilisateur écrit en français ou dans une autre langue.
 - N'utilise jamais l'anglais. Si tu dois expliquer un mot, donne son sens en français.
 - Phrases courtes, simples et naturelles, adaptées à l'oral (la réponse peut être lue à voix haute).
@@ -48,7 +50,23 @@ Règles :
 - Sois chaleureux et respectueux, comme dans une conversation entre Congolais.
 - Fais vivre la conversation : quand c'est naturel, termine par une courte question pour que l'utilisateur continue à parler dans la langue.
 - Si l'utilisateur demande le sens d'un mot, explique-le dans la langue de la conversation (le sens peut être cité en français), en t'appuyant d'abord sur les entrées du dictionnaire fournies avec les exemples. Si le mot n'y figure pas et que tu n'es pas sûr, dis-le plutôt que d'inventer.
-- Fournis aussi une traduction française fidèle de ta réponse, pour les personnes qui apprennent la langue."""
+- Fournis aussi une traduction française fidèle de ta réponse, pour les personnes qui apprennent la langue.{phrasebook}"""
+
+# Expressions courantes : sans elles, l'IA confond par ex. « okei wapi ? » (tu vas où ?) avec « tu es où ? »
+PHRASEBOOK = {
+    "ln": """
+
+Expressions courantes du lingala de Kinshasa (sens exact) :
+- mbote = bonjour ; sango nini ? = quoi de neuf ? ; ozali malamu ? = tu vas bien ? ; nazali malamu = je vais bien
+- matondo (ou matondi) = merci ; likambo te = de rien / pas de souci ; bongo yo ? / yo ? = et toi ?
+- ngai pe = moi aussi ; ee = oui ; te / ve = non ; limbisa ngai = pardon
+- okei wapi ? / ozali kokende wapi ? = tu vas où ? ; ozali wapi ? = tu es où ? ; outi wapi ? = tu viens d'où ?
+- nakei = je m'en vais ; tokomonana = à bientôt ; tokutana lobi = on se voit demain ; kende malamu = va en paix ; tikala malamu = reste en paix
+- nazali na nzala = j'ai faim ; nazali na mposa ya mai = j'ai soif ; olei ? = tu as mangé ? ; nalei = j'ai mangé
+- nalembi = je suis fatigué ; nazali na mpasi = j'ai mal / je souffre ; nazali na esengo = je suis content
+- nayoki te / nasosoli te = je n'ai pas compris ; loba lisusu = répète ; loba malembe = parle doucement
+- lobela ngai = raconte-moi / dis-moi ; nalingi yo = je t'aime ; lelo = aujourd'hui ; lobi = demain ou hier (selon le temps du verbe)""",
+}
 
 VOICE_RULE = """
 
@@ -58,15 +76,17 @@ Conversation orale en direct (comme un appel) :
 - Si le message est incompréhensible ou coupé, demande gentiment de répéter, dans la langue."""
 
 JSON_RULE = ('\n\nRéponds UNIQUEMENT avec un objet JSON, sans texte autour : '
-             '{"reply": "<ta réponse dans la langue de la conversation>", "reply_fr": "<sa traduction française>"}')
+             '{"compris": "<ce que l\'utilisateur a dit, en français>", '
+             '"reply": "<ta réponse dans la langue de la conversation>", "reply_fr": "<sa traduction française>"}')
 
 OUTPUT_SCHEMA = {
     "type": "object",
     "properties": {
+        "compris": {"type": "string", "description": "Ce que l'utilisateur a dit, en français"},
         "reply": {"type": "string", "description": "La réponse dans la langue de la conversation"},
         "reply_fr": {"type": "string", "description": "Traduction française de la réponse"},
     },
-    "required": ["reply", "reply_fr"],
+    "required": ["compris", "reply", "reply_fr"],
     "additionalProperties": False,
 }
 
@@ -81,7 +101,8 @@ def build_messages(lang: str, message: str, history: list[dict], examples: list[
                    voice: bool = False) -> tuple[str, list[dict]]:
     """(prompt système, messages user/assistant alternés) communs à toutes les IA."""
     lang_name = LANGUAGES[lang]
-    system = SYSTEM_TEMPLATE.format(lang_details=LANG_DETAILS.get(lang, lang_name)) + (VOICE_RULE if voice else "")
+    system = SYSTEM_TEMPLATE.format(lang_details=LANG_DETAILS.get(lang, lang_name),
+                                    phrasebook=PHRASEBOOK.get(lang, "")) + (VOICE_RULE if voice else "")
     messages: list[dict] = []
     for turn in history[-10:]:
         if not messages and turn["role"] != "user":
@@ -145,7 +166,7 @@ class OpenAICompatProvider:
         return bool(self.model and self.key)
 
     def complete(self, system: str, messages: list[dict]) -> Optional[dict]:
-        body = {"model": self.model, "temperature": 0.6, "max_tokens": 600,
+        body = {"model": self.model, "temperature": 0.4, "max_tokens": 1000,
                 "messages": [{"role": "system", "content": system + JSON_RULE}, *messages]}
         if self.json_mode:
             body["response_format"] = {"type": "json_object"}

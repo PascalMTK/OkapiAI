@@ -1,7 +1,7 @@
 from typing import Literal, Optional
 
 from fastapi import HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .config import CONGOLESE, LANGUAGES
 
@@ -43,13 +43,25 @@ class ContributionIn(BaseModel):
 
 class ChatTurn(BaseModel):
     role: Literal["user", "assistant"]
-    text: str = Field(max_length=1000)
+    text: str
+
+    @field_validator("text")
+    @classmethod
+    def _clip(cls, v: str) -> str:
+        # Un ancien tour trop long (réponse détaillée de l'IA) ne doit pas bloquer toute la suite
+        # de la conversation par une erreur 422 : on le raccourcit.
+        return v[:1000]
 
 
 class ConverseIn(BaseModel):
     lang: str
     message: str = Field(min_length=1, max_length=1000)
-    history: list[ChatTurn] = Field(default_factory=list, max_length=20)
+    history: list[ChatTurn] = Field(default_factory=list)
+
+    @field_validator("history")
+    @classmethod
+    def _recent(cls, v: list) -> list:
+        return v[-20:]  # seuls les derniers échanges comptent ; une longue conversation ne doit pas échouer
     voice: bool = False  # voix live : réponses courtes, à l'oral, qui relancent l'échange
 
 

@@ -24,6 +24,25 @@ log = logging.getLogger("okapiai.lexicon")
 KAIKKI = DATASET_DIR / "sources" / "kaikki" / "kaikki.org-dictionary-Lingala.jsonl"
 WIKI = DATASET_DIR / "knowledge" / "lexique_wikipedia.jsonl"
 
+# Français -> lingala courant de Kinshasa. Le Wiktionnaire donne parfois d'abord un emprunt rare
+# (« merci » -> mɛlɛsi) ou un mot vieilli (« bonjour » -> losáko) : ces usages passent devant.
+COMMON_FR = {
+    "merci": ["matɔ́ndɔ"], "merci beaucoup": ["matɔ́ndɔ mingi"], "de rien": ["likambo te"],
+    "bonjour": ["mbɔ́tɛ"], "salut": ["mbɔ́tɛ"], "bonsoir": ["mbɔ́tɛ", "pokwa malámu"],
+    "bonne nuit": ["butú malámu"], "au revoir": ["tikala malámu", "kende malámu"],
+    "a bientot": ["tokomonana"], "a demain": ["tokomonana lóbi"], "oui": ["ee"], "non": ["te", "ve"],
+    "pardon": ["limbisa ngai"], "excuse moi": ["limbisa ngai"], "s'il te plait": ["nabondeli yo"],
+    "s'il vous plait": ["nabondeli bino"], "bienvenue": ["boyei malámu"], "je t'aime": ["nalingi yo"],
+    "comment ca va": ["ozali malámu ?", "sango nini ?"], "ca va": ["nazali malámu"],
+    "comment tu t'appelles": ["kombo na yo nani ?"], "ami": ["moninga"], "amie": ["moninga"],
+    "eau": ["mái"], "manger": ["kolía"], "boire": ["komɛ́la"], "dormir": ["kolála"], "parler": ["koloba"],
+    "aller": ["kokɛndɛ"], "venir": ["koya"], "aimer": ["kolinga"], "travail": ["mosála"],
+    "argent": ["mbɔ́ngɔ"], "aujourd'hui": ["lɛlɔ́"], "demain": ["lóbi"], "hier": ["lóbi"],
+    "famille": ["libota"], "femme": ["mwási"], "homme": ["mobáli"], "enfant": ["mwǎna"],
+    "maison": ["ndáko"], "faim": ["nzala"], "soif": ["mposa ya mái"], "beau": ["kitɔ́kɔ"],
+    "belle": ["kitɔ́kɔ"], "bien": ["malámu"], "beaucoup": ["mingi"], "petit": ["moke"],
+}
+
 POS_FR = {"noun": "nom", "verb": "verbe", "adj": "adjectif", "adv": "adverbe", "intj": "interjection",
           "pron": "pronom", "prep": "préposition", "conj": "conjonction", "name": "nom propre",
           "num": "nombre", "phrase": "expression"}
@@ -156,9 +175,16 @@ class Lexicon:
         return out
 
     def reverse(self, french: str) -> list[str]:
-        """Mot ou expression française -> mots lingala."""
+        """Mot ou expression française -> mots lingala (les usages courants d'abord)."""
         self._load()
-        return self._fr.get(key(french), [])[:4]
+        k = key(french)
+        out = list(next((v for f, v in COMMON_FR.items() if key(f) == k), []))
+        if out:
+            return out  # l'usage courant suffit (pas d'emprunt rare en second choix)
+        for w in self._fr.get(k, []):
+            if key(w) not in {key(o) for o in out}:
+                out.append(w)
+        return out[:4]
 
     def examples_for(self, text: str, limit: int = 12) -> list[dict]:
         """Entrées du dictionnaire pour les mots d'un message (ancrage de l'IA)."""
