@@ -1,38 +1,48 @@
 <div align="center">
 
-<img src="frontend/assets/logo.jpg" alt="OkapiAI" width="230">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/logo-readme-dark.png">
+  <img src="docs/logo-readme.png" alt="OkapiAI" width="220">
+</picture>
 
 # OkapiAI
 
-**Traduire, converser et apprendre les langues nationales de la RDC.**
+### Parler, traduire et apprendre les langues nationales de la RDC
 
-Lingala · Swahili · Kikongo · Tshiluba
+**Lingala** · **Swahili** · **Tshiluba** · **Kikongo**
 
 <p>
-  <img src="https://img.shields.io/badge/Python-3.10%2B-1e7bff?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.10+">
-  <img src="https://img.shields.io/badge/FastAPI-backend-1e7bff?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI">
-  <img src="https://img.shields.io/badge/NLLB--200-traduction-f7d618?style=for-the-badge&logoColor=black" alt="NLLB-200">
-  <img src="https://img.shields.io/badge/Claude-conversation-ce1021?style=for-the-badge" alt="Claude">
-  <img src="https://img.shields.io/badge/statut-MVP-0a3fb8?style=for-the-badge" alt="Statut MVP">
+  <img src="https://img.shields.io/badge/Python-3.10%2B-1e7bff?style=flat-square&logo=python&logoColor=white" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/FastAPI-backend-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI">
+  <img src="https://img.shields.io/badge/IA-Gemini%20%E2%86%92%20Groq-f7d618?style=flat-square" alt="Gemini puis Groq">
+  <img src="https://img.shields.io/badge/voix-MMS%20%C2%B7%20Whisper%20%C2%B7%20VITS-ce1021?style=flat-square" alt="MMS, Whisper, VITS">
+  <img src="https://img.shields.io/badge/statut-MVP-0a3fb8?style=flat-square" alt="Statut MVP">
 </p>
 
+<sub>
+
+[À propos](#-à-propos) ·
 [Fonctionnalités](#-fonctionnalités) ·
-[Démarrage rapide](#-démarrage-rapide) ·
-[Validation des données](#-validation-des-données) ·
+[Langues](#-état-des-langues) ·
+[Démarrage](#-démarrage-rapide) ·
+[Voix](#%EF%B8%8F-voix-live) ·
+[Données](#-validation-des-données) ·
 [Configuration](#%EF%B8%8F-configuration) ·
-[API](#-api) ·
 [Entraînement](#-entraînement-des-modèles) ·
 [Contribuer](#-contribuer)
 
+</sub>
+
 </div>
 
----
+<br>
 
 ## 🦓 À propos
 
-Les langues congolaises sont parlées par des dizaines de millions de personnes, mais les outils numériques qui les comprennent restent rares. **OkapiAI** est une plateforme communautaire qui construit, avec les locuteurs eux-mêmes, des **données de qualité** (texte et voix). Ces données servent ensuite à entraîner des modèles de traduction, de reconnaissance vocale et de conversation.
+Les langues congolaises sont parlées par des dizaines de millions de personnes, mais les outils numériques qui les comprennent restent rares. **OkapiAI** est une plateforme communautaire qui construit, avec les locuteurs eux-mêmes, des **données de qualité** (texte et voix). Ces données servent ensuite à entraîner des modèles de traduction, de reconnaissance vocale, de synthèse vocale et de conversation.
 
-Chaque phrase qui entre dans le dataset d'entraînement a été **proposée par au moins 10 personnes différentes**, puis **validée par un administrateur**.
+> [!TIP]
+> Chaque phrase qui entre dans le dataset d'entraînement a été **proposée par au moins 10 personnes différentes**, puis **validée par un administrateur**.
 
 <div align="center">
   <img src="docs/apercu.png" alt="Aperçu de l'interface OkapiAI" width="860">
@@ -40,13 +50,47 @@ Chaque phrase qui entre dans le dataset d'entraînement a été **proposée par 
 
 ## ✨ Fonctionnalités
 
-| | Module | Description |
-|---|---|---|
-| 💬 | **Chat** | **Converser** : l'utilisateur écrit en langue nationale, le système **répond dans la même langue** (traduction française disponible). **Traduire** : un mot ou une phrase, dans les deux sens. |
-| 🎙️ | **Voix live** | Les mêmes modes à la voix : on parle, la voix est transcrite, puis le système répond ou traduit. On peut enregistrer sa voix dans le dataset. |
-| ➕ | **Contribuer** | Proposer une **traduction** ou un **dialogue** (message → réponse), avec la voix, et confirmer les propositions des autres. |
-| 📚 | **Apprendre** | Cartes et quiz générés **uniquement** à partir des données validées, avec la prononciation enregistrée. |
-| 🛡️ | **Administration** | Valider ou rejeter les propositions, corriger le texte final, écouter les voix, suivre les statistiques, exporter le dataset. |
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>💬 Chat</h3>
+      <b>Converser</b> : on écrit en langue nationale, OkapiAI <b>répond dans la même langue</b> (traduction française à côté).<br>
+      <b>Traduire</b> : un mot ou une phrase, dans les deux sens.
+    </td>
+    <td width="50%" valign="top">
+      <h3>🎙️ Voix live</h3>
+      On parle, OkapiAI transcrit, répond <b>à voix haute</b> puis réécoute. On peut lui couper la parole à tout moment. L'<b>écoute tolérante</b> comprend un apprenant qui prononce mal.
+    </td>
+  </tr>
+  <tr>
+    <td valign="top">
+      <h3>➕ Contribuer</h3>
+      Proposer une <b>traduction</b> ou un <b>dialogue</b> (message → réponse), avec sa voix, et confirmer les propositions des autres.
+    </td>
+    <td valign="top">
+      <h3>📚 Apprendre</h3>
+      Cartes et quiz générés <b>uniquement</b> à partir des données validées, avec la prononciation enregistrée.
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" valign="top">
+      <h3>🛡️ Administration</h3>
+      Valider ou rejeter les propositions, corriger le texte final, écouter les voix, suivre les statistiques, exporter le dataset.
+    </td>
+  </tr>
+</table>
+
+## 🌍 État des langues
+
+| Langue | Conversation | Reconnaissance vocale | Voix d'OkapiAI |
+|---|:---:|---|---|
+| 🟦 **Lingala** | ✅ correcte | ✅ `facebook/mms-1b-all` (adaptateur `lin`) | ✅ VITS Open Bible lingala (secours : `khof312/mms-tts-lin`) |
+| 🟩 **Swahili** | ✅ bonne | ✅ `facebook/mms-1b-all` (adaptateur `swh`) | ✅ `facebook/mms-tts-swh` |
+| 🟨 **Tshiluba** | 🟡 plus faible | ✅ `abdouaziiz/tshiluba` (Whisper small affiné) | 🔄 voix tshiluba en cours d'entraînement (provisoire : la voix lingala) |
+| 🟥 **Kikongo** | 🟡 plus faible | ⏳ pas encore de modèle public : on tape ce qu'on a dit | ⏳ pas encore |
+
+> [!NOTE]
+> Les réponses générées par l'IA sont signalées comme telles dans l'interface. Chaque réponse peut être **corrigée**, et la correction suit le circuit de validation.
 
 ## 🚀 Démarrage rapide
 
@@ -74,40 +118,43 @@ uvicorn app.main:app --reload
 > Un compte administrateur `admin` / `admin123` est créé au premier démarrage.
 > Changez `OKAPI_ADMIN_PASSWORD` et `OKAPI_SECRET_KEY` avant toute mise en ligne.
 
-### Modules optionnels
-
-```bash
-pip install torch transformers huggingface_hub imageio-ffmpeg   # voix live (MMS)
-```
-
-#### Conversation IA gratuite : Gemini + Groq
+### 🤖 Conversation IA gratuite : Gemini + Groq
 
 Copiez `backend/.env.example` en `backend/.env` et collez vos clés gratuites :
 [Gemini](https://aistudio.google.com/apikey) (`GEMINI_API_KEY`) et [Groq](https://console.groq.com/keys) (`GROQ_API_KEY`).
-OkapiAI essaie **Gemini, puis Groq** : si l'un atteint sa limite gratuite ou ne répond pas, l'autre prend le relais automatiquement. Aucun paquet à installer. Les IA restent ancrées sur le dataset validé et le dictionnaire, mais peuvent faire des erreurs en langue nationale : les utilisateurs peuvent corriger chaque réponse.
 
-#### Voix live : parler avec OkapiAI
+OkapiAI essaie **Gemini, puis Groq** : si l'un atteint sa limite gratuite ou ne répond pas, l'autre prend le relais automatiquement. Aucun paquet à installer. Les IA restent ancrées sur le dataset validé, le lexique et le corpus, mais peuvent faire des erreurs en langue nationale.
 
-La voix live utilise les modèles **Meta MMS** : on parle, OkapiAI transcrit, répond dans la même langue **à voix haute**, puis réécoute (mode « Conversation continue »). En « Détection automatique », il reconnaît seul la langue parlée.
-
-| Langue | Reconnaissance vocale | Voix d'OkapiAI |
-|---|---|---|
-| Lingala | ✅ `facebook/mms-1b-all` (adaptateur `lin`) | ✅ `khof312/mms-tts-lin` |
-| Swahili | ✅ `facebook/mms-1b-all` (adaptateur `swh`) | ✅ `facebook/mms-tts-swh` |
-| Tshiluba | ✅ `abdouaziiz/tshiluba` (Whisper small affiné, ~15 % de mots faux, Apache-2.0) → `backend/models/whisper-tshiluba/` | ⚠️ provisoire : la voix lingala lit le tshiluba |
-| Kikongo | ⏳ pas encore de modèle public : on tape ce qu'on a dit | ⏳ pas encore |
-
-Téléchargement unique des modèles (~4,3 Go, GPU conseillé mais pas obligatoire) :
+## 🎙️ Voix live
 
 ```bash
-python -c "from huggingface_hub import snapshot_download as d; d('khof312/mms-tts-lin'); d('facebook/mms-tts-swh'); d('facebook/mms-1b-all', allow_patterns=['*.json','model.safetensors','adapter.lin.safetensors','adapter.swh.safetensors','adapter.fra.safetensors'])"
+pip install torch transformers huggingface_hub imageio-ffmpeg
+```
+
+Téléchargement unique des modèles (~5 Go, GPU conseillé mais pas obligatoire) :
+
+```bash
+# lingala et swahili (MMS)
+python -c "from huggingface_hub import snapshot_download as d; d('khof312/mms-tts-lin'); d('facebook/mms-tts-swh'); d('facebook/mms-1b-all', local_dir='backend/models/mms-1b-all', allow_patterns=['*.json','model.safetensors','adapter.lin.safetensors','adapter.swh.safetensors','adapter.fra.safetensors'])"
 # tshiluba (~1 Go)
 python -c "from huggingface_hub import snapshot_download as d; d('abdouaziiz/tshiluba', local_dir='backend/models/whisper-tshiluba', allow_patterns=['*.json','*.txt','model.safetensors'])"
 ```
 
-Tshiluba : en « Détection automatique », seuls le lingala et le swahili sont reconnus ; choisissez « Tshiluba » dans le menu Langue. Les phrases tshiluba (`dataset/sources/tshiluba/phrases.jsonl`, 23 791 phrases, corpus [DanMM96/Tshiluba-dataset](https://huggingface.co/datasets/DanMM96/Tshiluba-dataset), CC BY 4.0, surtout biblique) servent d'exemples à l'IA et de vocabulaire à l'écoute tolérante ; elles se régénèrent avec `python tools/import_tshiluba.py`.
+En « Détection automatique », OkapiAI reconnaît seul le lingala et le swahili ; pour le tshiluba, choisissez « Tshiluba » dans le menu Langue.
 
-Les modèles sont chargés au démarrage du serveur (en arrière-plan). Variables utiles : `OKAPI_ASR=off`, `OKAPI_TTS=off`, `OKAPI_VOICE_WARMUP=0`. Les voix MMS sont sous licence **CC BY-NC 4.0** (usage non commercial).
+### Voix plus naturelles (VITS)
+
+Les voix entraînées tournent dans un petit serveur séparé, lancé avec le Python où `coqui-tts` est installé :
+
+```bash
+python tools/voice_server.py --port 8100                         # lingala
+python tools/voice_server.py --speaker tshiluba --port 8101      # tshiluba
+```
+
+Puis, dans `backend/.env` : `OKAPI_TTS_LN_URL=http://127.0.0.1:8100` et `OKAPI_TTS_LUA_URL=http://127.0.0.1:8101`. Si un serveur ne répond pas, OkapiAI repasse automatiquement sur la voix MMS.
+
+> [!WARNING]
+> Les voix MMS sont sous licence **CC BY-NC 4.0** (usage non commercial). La voix Open Bible lingala est sous **CC BY-SA 4.0**.
 
 ## 🧭 Validation des données
 
@@ -138,87 +185,106 @@ flowchart LR
 - **Pas de raccourci :** l'admin peut corriger le texte final, mais **ne peut pas** approuver avant le seuil.
 - **Voix privées :** les enregistrements bruts ne sont visibles que par leur auteur et l'admin. Ils deviennent publics une fois validés.
 
-## 🗣️ Converser en langue nationale
+### Comment OkapiAI répond
 
 ```mermaid
 flowchart LR
-    Q[Message en lingala, swahili, kikongo ou tshiluba] --> D{Dialogue validé ?}
+    Q[Message en langue nationale] --> D{Dialogue validé ?}
     D -->|oui| R1[Réponse de la communauté]
-    D -->|non| I{IA activée ?}
-    I -->|oui| R2["Réponse IA ancrée sur le dataset"]
+    D -->|non| I{IA disponible ?}
+    I -->|oui| R2["Gemini → Groq, ancrés sur le dataset"]
     I -->|non| R3[« Apprenez-moi une réponse »]
     R1 & R2 & R3 --> F[✏️ Corriger → nouvelle contribution]
 ```
 
-Le bot répond toujours **dans la langue de l'utilisateur**. Avec chaque message, l'IA reçoit les exemples validés les plus proches et est invitée à reprendre leur vocabulaire. Chaque réponse peut être **corrigée** : la correction suit le même circuit de validation, et le système s'améliore avec l'usage.
-
-> [!NOTE]
-> La qualité de l'IA est bonne en swahili, correcte en lingala, et plus faible en kikongo et en tshiluba. Les réponses générées sont signalées comme telles dans l'interface.
-
 ## ⚙️ Configuration
 
-Toutes les options se règlent par variables d'environnement.
+Toutes les options se règlent par variables d'environnement (ou dans `backend/.env`).
+
+<details>
+<summary><b>Plateforme et données</b></summary>
 
 | Variable | Défaut | Rôle |
 |---|---|---|
-| `OKAPI_MIN_SIMILAR` | `10` | Nombre de contributeurs différents requis avant la revue admin |
+| `OKAPI_MIN_SIMILAR` | `10` | Contributeurs différents requis avant la revue admin |
 | `OKAPI_SIMILARITY_THRESHOLD` | `0.85` | Seuil de similarité pour regrouper deux contributions |
 | `OKAPI_LOOKUP_THRESHOLD` | `0.80` | Seuil pour qu'une recherche dans le dataset soit acceptée |
 | `OKAPI_DATABASE_URL` | SQLite local | Ex. `postgresql+psycopg://user:pass@host/okapi` |
 | `OKAPI_SECRET_KEY` | *(à changer)* | Clé de signature des sessions |
 | `OKAPI_ADMIN_USERNAME` / `OKAPI_ADMIN_PASSWORD` | `admin` / `admin123` | Compte admin initial |
-| `ANTHROPIC_API_KEY` | — | Active la conversation IA |
-| `OKAPI_LLM_MODEL` | `claude-opus-5-5` | Modèle utilisé pour la conversation |
-| `OKAPI_LLM_EFFORT` | `low` | Profondeur de réflexion (`low` → `max`) |
-| `OKAPI_LLM_ENABLED` | — | `0` pour couper l'IA |
-| `OKAPI_WHISPER_MODEL` | `small` | Taille du modèle de reconnaissance vocale |
-
-> [!WARNING]
-> Lorsque l'IA est activée, les messages des utilisateurs sont envoyés à l'API d'Anthropic, et chaque requête est facturée sur votre compte. Informez-en vos utilisateurs.
-
-## 🔌 API
-
-<details>
-<summary><b>Voir les principaux points d'accès</b></summary>
-
-| Méthode | Route | Description |
-|---|---|---|
-| `POST` | `/api/auth/register` · `/api/auth/login` | Créer un compte, se connecter |
-| `POST` | `/api/converse` | Converser en langue nationale |
-| `POST` | `/api/voice/converse` | Converser à la voix |
-| `POST` | `/api/translate` · `/api/chat` | Traduire (réponse brute ou formulée) |
-| `POST` | `/api/voice/chat` | Traduire à la voix |
-| `POST` | `/api/contributions/text` · `/api/contributions/voice` | Proposer une traduction ou un dialogue |
-| `GET` | `/api/contributions/proposals` | Propositions à confirmer |
-| `POST` | `/api/contributions/proposals/{id}/confirm` | Confirmer une proposition |
-| `GET` | `/api/learn/cards` · `/api/learn/quiz` | Cartes et quiz |
-| `GET` | `/api/admin/propositions` | Propositions en attente *(admin)* |
-| `POST` | `/api/admin/propositions/{id}/approve` · `/reject` | Décision admin *(admin)* |
-| `GET` | `/api/admin/export/entrainement.jsonl` | Export du dataset d'entraînement *(admin)* |
-
-La documentation complète et testable est générée automatiquement sur `/docs`.
 
 </details>
 
+<details>
+<summary><b>Conversation IA</b></summary>
+
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `GEMINI_API_KEY` · `GROQ_API_KEY` | — | Clés gratuites des services IA |
+| `OKAPI_LLM_PROVIDERS` | `gemini,groq` | Ordre d'essai des services |
+| `OKAPI_GEMINI_MODEL` | `gemini-flash-lite-latest` | Modèle Gemini |
+| `OKAPI_GROQ_MODEL` | `openai/gpt-oss-120b` | Modèle Groq |
+| `OKAPI_LLM_TIMEOUT` | `12` | Délai maximum d'une réponse (secondes) |
+| `OKAPI_LLM_ENABLED` | — | `0` pour couper l'IA |
+
+</details>
+
+<details>
+<summary><b>Voix</b></summary>
+
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `OKAPI_ASR` | `mms` | Reconnaissance vocale : `mms`, `whisper` ou `off` |
+| `OKAPI_ASR_DEVICE` · `OKAPI_TTS_DEVICE` | auto | `cpu` pour laisser la carte graphique libre |
+| `OKAPI_TTS` | `on` | `off` pour couper la voix d'OkapiAI |
+| `OKAPI_TTS_LN_URL` · `OKAPI_TTS_LUA_URL` | — | Serveurs de voix VITS (lingala, tshiluba) |
+| `OKAPI_VOICE_WARMUP` | — | `0` pour ne pas charger les modèles au démarrage |
+
+</details>
+
+> [!WARNING]
+> Lorsque l'IA est activée, les messages des utilisateurs sont envoyés à Google (Gemini) ou à Groq. Informez-en vos utilisateurs.
+
 ## 🧠 Entraînement des modèles
 
-OkapiAI s'appuie sur **NLLB-200** (Meta), qui connaît déjà les quatre langues, et l'affine avec le dataset validé par la communauté.
+### Traduction (NLLB-200)
+
+OkapiAI s'appuie sur **NLLB-200** (Meta), qui connaît déjà les quatre langues, et l'affine avec le dataset validé.
 
 ```bash
 cd backend
 pip install -r training/requirements.txt            # GPU recommandé
-
 python -m training.export_dataset --out training/export
 python -m training.train_nllb --data training/export/traduction.jsonl --epochs 5
 ```
 
 | Fichier exporté | Usage |
 |---|---|
-| `traduction.jsonl` | Paires de traduction dans les deux sens → fine-tuning NLLB-200 |
-| `dialogue.jsonl` | Paires message → réponse → chatbot conversationnel |
-| `voix.jsonl` | Audio + transcription + langue → reconnaissance vocale (Whisper, MMS) |
+| `traduction.jsonl` | Paires de traduction dans les deux sens → NLLB-200 |
+| `dialogue.jsonl` | Paires message → réponse → conversation |
+| `voix.jsonl` | Audio + transcription + langue → reconnaissance vocale |
 
-Le modèle est enregistré dans `backend/models/okapi-nllb` et utilisé automatiquement au redémarrage. L'ordre de traduction est le suivant : **dataset validé → modèle entraîné → mot à mot**.
+L'ordre de traduction est : **dataset validé → modèle entraîné → mot à mot**.
+
+### Voix d'OkapiAI (VITS)
+
+`tools/train_voice.py` affine la voix lingala Open Bible sur un seul lecteur, puis vérifie qu'elle se comprend avant de la mettre en service.
+
+```mermaid
+flowchart LR
+    D[Enregistrements d'un lecteur] -->|prepare| P[Phrases 22 kHz + texte]
+    P -->|train| C[Sauvegardes]
+    C -->|check : écoutées par la reconnaissance vocale| V{Lettres mal comprises ≤ 12 % ?}
+    V -->|oui| A[approved_model.pth → voice_server]
+    V -->|non| B[La voix d'origine reste utilisée]
+```
+
+```bash
+python tools/train_voice.py prepare --speaker tshiluba
+python tools/train_voice.py train   --speaker tshiluba --fp16 --batch 4 --epochs 30
+python tools/train_voice.py train   --speaker tshiluba --fp16 --resume              # reprendre
+python tools/train_voice.py check   --speaker tshiluba                              # backend lancé
+```
 
 ## 🏗️ Architecture
 
@@ -232,35 +298,44 @@ OkapiAI/
 │   │   └── services/
 │   │       ├── dataset.py       # Règle des 10 contributeurs + validation admin
 │   │       ├── conversation.py  # Dialogue validé → IA → « apprenez-moi »
-│   │       ├── llm.py           # Conversation IA (Claude), optionnelle
+│   │       ├── llm.py           # Relais Gemini → Groq
 │   │       ├── translator.py    # Dataset → modèle NLLB → mot à mot
-│   │       └── speech.py        # Reconnaissance vocale (faster-whisper), optionnelle
-│   ├── training/                # Export du dataset et fine-tuning
+│   │       ├── speech.py        # Reconnaissance vocale (MMS, Whisper tshiluba)
+│   │       ├── hearing.py       # Écoute tolérante (prononciation d'apprenant)
+│   │       ├── tts.py           # Voix d'OkapiAI (serveur VITS ou MMS)
+│   │       ├── lexicon.py · corpus.py · basics.py   # Dictionnaire, corpus, phrases de base
+│   │       └── recordings.py    # Enregistrements du dataset sous les réponses
+│   ├── training/                # Export du dataset et fine-tuning NLLB
 │   └── tests/
 ├── frontend/                    # Interface web (HTML · Tailwind · JavaScript)
 ├── app/                         # Recherche et dictée sur le corpus lingala (Node, port 8787)
-├── dataset/                     # Corpus lingala (métadonnées versionnées, audio local)
-│   ├── clips/<video_id>/        # Extraits de cours YouTube + metadata.jsonl (à relire)
+├── dataset/                     # Corpus (métadonnées versionnées, audio local)
+│   ├── clips/<video_id>/        # Extraits de cours YouTube + metadata.jsonl
 │   ├── knowledge/               # Lexique, grammaire et sections Wikipédia
-│   ├── sources/                 # LRSC (parole lue, CC BY 4.0) · Peace Corps · Kaikki
+│   ├── sources/                 # LRSC · Peace Corps · Kaikki · Tshiluba
 │   └── raw/                     # Téléchargements bruts (non versionnés, sauf wikipedia/)
-├── tools/                       # Scripts de collecte, d'import et de relecture du corpus
+├── tools/                       # Collecte, import, relecture, voix
 └── docs/
 ```
 
-### Corpus lingala (`dataset/` et `tools/`)
+<details>
+<summary><b>Outils du corpus (<code>tools/</code>)</b></summary>
 
 | Commande | Rôle |
 |---|---|
 | `python tools/cut_videos.py <lien YouTube>` | Télécharge une vidéo ou un Short et la découpe en phrases |
-| `python tools/import_lrsc.py` | Importe le Lingala Read Speech Corpus (Hugging Face) |
+| `python tools/import_lrsc.py` | Importe le Lingala Read Speech Corpus (CC BY 4.0) |
+| `python tools/import_tshiluba.py` | Importe les phrases tshiluba ([DanMM96/Tshiluba-dataset](https://huggingface.co/datasets/DanMM96/Tshiluba-dataset), CC BY 4.0) |
 | `python tools/import_peace_corps.py` · `import_wikipedia.py` · `import_maloba.py` | Importent les sources texte |
 | `python tools/tag_language.py` · `transcribe_ln.py` | Repèrent et transcrivent les passages en lingala des clips |
 | `python tools/review_server.py` | Interface de relecture des clips (http://localhost:8765) |
+| `python tools/train_voice.py` · `voice_server.py` | Entraînent et servent les voix VITS |
 
 L'application de recherche se lance avec `node app/server.mjs` (Node 20+), puis http://127.0.0.1:8787.
 
-**Stack :** FastAPI · SQLAlchemy 2 · SQLite / PostgreSQL · Tailwind CSS · Lucide · JavaScript · Hugging Face Transformers · Anthropic SDK · faster-whisper
+</details>
+
+**Stack :** FastAPI · SQLAlchemy 2 · SQLite / PostgreSQL · Tailwind CSS · Lucide · JavaScript · Hugging Face Transformers · Meta MMS · Whisper · Coqui TTS (VITS) · Gemini · Groq
 
 ## 🧪 Tests
 
@@ -275,11 +350,13 @@ Les tests couvrent le circuit complet : seuil des 10 contributeurs, anti-spam, v
 
 - [x] Traduction communautaire validée (10 contributeurs + admin)
 - [x] Collecte vocale et apprentissage
-- [x] Conversation en langue nationale
-- [ ] Synthèse vocale entraînée sur les voix validées, pour que le bot parle lingala ou tshiluba
-- [x] Reconnaissance vocale du tshiluba
-- [ ] Reconnaissance vocale du kikongo, voix tshiluba entraînée
-- [ ] Conversation vocale en streaming (WebSocket)
+- [x] Conversation en langue nationale (Gemini → Groq)
+- [x] Voix live avec barge-in et écoute tolérante
+- [x] Reconnaissance vocale du lingala, du swahili et du tshiluba
+- [x] Voix lingala claire (VITS Open Bible)
+- [ ] Voix tshiluba entraînée *(en cours)*
+- [ ] Voix lingala avec l'accent d'un locuteur du corpus
+- [ ] Reconnaissance vocale et voix du kikongo
 - [ ] Limitation de débit et nettoyage automatique des audios non utilisés
 - [ ] Application mobile
 
@@ -294,15 +371,17 @@ Pour contribuer au code :
 3. Ouvrez une *pull request* qui décrit le changement
 
 > [!CAUTION]
-> Ne commitez jamais les données de la plateforme (`backend/data/`, exports `*.jsonl`), les fichiers audio ni les modèles entraînés : ils sont exclus par le `.gitignore`. Seules les métadonnées de `dataset/` sont versionnées.
+> Ne commitez jamais `backend/.env` (vos clés), les données de la plateforme (`backend/data/`, exports `*.jsonl`), les fichiers audio ni les modèles entraînés : ils sont exclus par le `.gitignore`. Seules les métadonnées de `dataset/` sont versionnées.
 
 ## 📄 Licence
 
-La licence du projet n'a pas encore été choisie. Tant qu'aucune licence n'est publiée, tous les droits sont réservés aux auteurs.
+La licence du projet n'a pas encore été choisie. Tant qu'aucune licence n'est publiée, tous les droits sont réservés aux auteurs. Les modèles et corpus utilisés gardent leur propre licence (voir ci-dessus).
 
 ---
 
 <div align="center">
+
+<img src="frontend/assets/logo-mark.png" alt="" width="48">
 
 **Fait avec ❤️ pour les langues de la République démocratique du Congo** 🇨🇩
 
