@@ -6,7 +6,7 @@ Puis, dans backend/.env :  OKAPI_TTS_LN_URL=http://127.0.0.1:8100
 
   GET /health            -> {"ok": true, "model": "..."}
   GET /tts?text=...      -> WAV (22 050 Hz)
-Le serveur recharge tout seul le meilleur modèle quand l'entraînement en sauvegarde un nouveau.
+Le serveur recharge tout seul la voix quand une nouvelle version est validée (voir _best).
 N'écoute que sur 127.0.0.1.
 """
 import argparse
@@ -20,7 +20,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from train_voice import clean_text, out_dir  # noqa: E402
+from train_voice import base_files, clean_text, out_dir  # noqa: E402
 
 MAX_CHARS = 600
 
@@ -34,12 +34,19 @@ class Voice:
         self.mtime = None
 
     def _best(self):
+        """Voix affinée validée (approved_model.pth, écrit par `train_voice.py check` quand la voix
+        se comprend bien), sinon la voix lingala d'origine (Open Bible), toujours claire.
+        Un best_model.pth seul ne suffit pas : il peut ressembler au locuteur mais mal articuler."""
         runs = sorted(out_dir(self.speaker).glob(f"run-{self.speaker}-*"), key=lambda p: p.stat().st_mtime)
         for run in reversed(runs):
-            best = run / "best_model.pth"
-            if best.exists() and (run / "config.json").exists():
-                return best, run / "config.json"
-        return None, None
+            ok = run / "approved_model.pth"
+            if ok.exists() and (run / "config.json").exists():
+                return ok, run / "config.json"
+        try:
+            ck, cfg = base_files()
+            return Path(ck), Path(cfg)
+        except Exception:
+            return None, None
 
     def _ensure(self):
         best, cfg = self._best()
@@ -110,4 +117,6 @@ if __name__ == "__main__":
     voice = Voice(a.speaker)
     server = ThreadingHTTPServer(("127.0.0.1", a.port), make_handler(voice))
     print(f"Serveur de voix ({a.speaker}) sur http://127.0.0.1:{a.port}", flush=True)
+    # Charge la voix tout de suite : sinon la 1re phrase d'OkapiAI attend ~30 s
+    threading.Thread(target=lambda: voice.wav("mbote"), daemon=True).start()
     server.serve_forever()

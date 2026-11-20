@@ -3,13 +3,16 @@
 Usage (avec un Python où `coqui-tts` est installé, voir le README) :
   python tools/train_voice.py prepare --speaker florent     # prépare les données
   python tools/train_voice.py train   --speaker florent     # affinage (plusieurs heures, GPU conseillé)
+  python tools/train_voice.py check   --speaker florent     # valide la voix (backend lancé)
   python tools/train_voice.py sample  --speaker florent     # génère des phrases de test
-  python tools/train_voice.py train   --speaker florent --resume --lr 2e-5 --epochs 80   # reprise
+  python tools/train_voice.py train   --speaker florent --fp16 --epochs 30   # rapide (carte 4 Go)
 
 Données  : dataset/sources/lrsc/  (CC BY 4.0) -> backend/models/voix-<speaker>/data/
            wavs/<id>.wav (22 050 Hz mono, silences coupés) + metadata.csv (format LJSpeech)
 Départ   : multilingual-tts/VITS-OpenBible-Lingala (CC BY-SA 4.0)
-Résultat : backend/models/voix-<speaker>/run-*/best_model.pth (+ config.json)
+Résultat : backend/models/voix-<speaker>/run-*/checkpoint_*.pth ; `check` fait écouter chacun par
+           la reconnaissance vocale et copie le meilleur compréhensible dans approved_model.pth,
+           la seule voix affinée que sert tools/voice_server.py (sinon : la voix d'origine).
 """
 import argparse
 import json
@@ -92,7 +95,8 @@ def base_files():
     return hf_hub_download(BASE_REPO, "model_last.pth"), hf_hub_download(BASE_REPO, "config.json")
 
 
-def train(speaker: str, epochs: int, batch: int, resume: bool = False, lr: float = 5e-5) -> None:
+def train(speaker: str, epochs: int, batch: int, resume: bool = False, lr: float = 5e-5,
+          freeze_text: bool = True, fp16: bool = False) -> None:
     from trainer import Trainer, TrainerArgs
     from TTS.config.shared_configs import BaseDatasetConfig
     from TTS.tts.configs.vits_config import VitsConfig
@@ -116,7 +120,15 @@ def train(speaker: str, epochs: int, batch: int, resume: bool = False, lr: float
     config.run_eval = True
     config.test_delay_epochs = 0
     config.test_sentences = [[s] for s in TEST_SENTENCES]
-    config.print_step, config.save_step, config.save_n_checkpoints = 25, 1000, 1
+    # Précision complète par défaut (en fp16, quelques pas partent en NaN) ; --fp16 est ~5x plus
+    # rapide sur une carte de 4 Go, et les pas en NaN sont simplement ignorés.
+    config.mixed_precision = fp16
+    # Le lecteur de texte (encodeur) reste celui de la voix d'origine, qui articule bien le lingala :
+    # seuls le timbre, le rythme et l'accent du locuteur s'apprennent. Sans ce gel, 24 min de
+    # données suffisaient à rendre la voix à moitié incompréhensible (52 % de lettres fausses).
+    config.model_args.freeze_encoder = freeze_text
+    # Points de sauvegarde réguliers : `check` choisit celui qui se comprend le mieux
+    config.print_step, config.save_step, config.save_n_checkpoints = 25, 250, 6
     config.save_best_after = 500
     config.num_loader_workers = config.num_eval_loader_workers = 0   # Windows
     config.max_audio_len = 12 * RATE                # évite de saturer les 4 Go de VRAM
@@ -162,15 +174,88 @@ def sample(speaker: str) -> None:
     print(f"Échantillons ({model.name}) -> {dst}")
 
 
+CHECK_SENTENCES = TEST_SENTENCES + ["lobi tokokende na zando kosomba mbisi mpe pondu",
+                                    "mama azali kolamba bilei na ndako", "olingi tosolola likambo nini lelo"]
+MAX_CER = 0.12   # au-delà, la voix est jugée trop difficile à comprendre
+ASR_URL = "http://127.0.0.1:8000/api/voice/transcribe"
+
+
+def _asr(wav_bytes: bytes) -> str:
+    """Ce que la reconnaissance vocale d'OkapiAI (backend lancé) entend dans un WAV."""
+    import urllib.request
+    import uuid
+    b = uuid.uuid4().hex
+    head = (f'--{b}\r\nContent-Disposition: form-data; name="lang"\r\n\r\nln\r\n--{b}\r\n'
+            'Content-Disposition: form-data; name="audio"; filename="a.wav"\r\nContent-Type: audio/wav\r\n\r\n')
+    body = head.encode() + wav_bytes + f"\r\n--{b}--\r\n".encode()
+    req = urllib.request.Request(ASR_URL, body, {"Content-Type": f"multipart/form-data; boundary={b}"})
+    with urllib.request.urlopen(req, timeout=180) as r:
+        return json.load(r).get("transcript") or ""
+
+
+def _cer(ref: str, hyp: str) -> float:
+    ref, hyp = ref.replace(" ", ""), (clean_text(hyp) or "").replace(" ", "")
+    d = list(range(len(hyp) + 1))
+    for i, a in enumerate(ref, 1):
+        prev, d[0] = d[0], i
+        for j, c in enumerate(hyp, 1):
+            prev, d[j] = d[j], min(d[j] + 1, d[j - 1] + 1, prev + (a != c))
+    return d[-1] / len(ref)
+
+
+def check(speaker: str) -> None:
+    """Fait écouter chaque sauvegarde du dernier entraînement par la reconnaissance vocale et
+    valide la plus récente qui se comprend bien (approved_model.pth, servie par voice_server)."""
+    import io
+    import wave
+    import numpy as np
+    import torch
+    from TTS.utils.synthesizer import Synthesizer
+    run = latest_run(speaker)
+    cands = sorted(run.glob("checkpoint_*.pth"), key=lambda p: int(p.stem.split("_")[1]))
+    scores = {}
+    for ck in cands:
+        synth = Synthesizer(tts_checkpoint=str(ck), tts_config_path=str(run / "config.json"),
+                            use_cuda=torch.cuda.is_available())
+        errs = []
+        for s in CHECK_SENTENCES:
+            torch.manual_seed(0)
+            wav = np.asarray(synth.tts(s), dtype=np.float32)
+            buf = io.BytesIO()
+            with wave.open(buf, "wb") as w:
+                w.setnchannels(1)
+                w.setsampwidth(2)
+                w.setframerate(synth.output_sample_rate)
+                w.writeframes((np.clip(wav, -1, 1) * 32767).astype("<i2").tobytes())
+            errs.append(_cer(s, _asr(buf.getvalue())))
+        scores[ck.name] = sum(errs) / len(errs)
+        print(f"{ck.name:22} lettres mal comprises : {scores[ck.name]:.0%}", flush=True)
+        del synth
+        torch.cuda.empty_cache()
+    (run / "check.json").write_text(json.dumps(scores, indent=1), encoding="utf-8")
+    ok = [c for c in cands if scores[c.name] <= MAX_CER]
+    if not ok:
+        print(f"Aucune sauvegarde sous {MAX_CER:.0%} : la voix d'origine reste utilisée.")
+        return
+    best = ok[-1]  # la plus entraînée parmi celles qui se comprennent : la plus proche du locuteur
+    state = torch.load(best, map_location="cpu", weights_only=False)
+    torch.save({"model": state["model"], "config": state.get("config"), "step": state.get("step")},
+               run / "approved_model.pth")
+    print(f"Validée : {best.name} ({scores[best.name]:.0%}) -> {run / 'approved_model.pth'}")
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("step", choices=["prepare", "train", "sample"])
+    ap.add_argument("step", choices=["prepare", "train", "check", "sample"])
     ap.add_argument("--speaker", default="florent")
     ap.add_argument("--epochs", type=int, default=120)
     ap.add_argument("--batch", type=int, default=8)
     ap.add_argument("--resume", action="store_true", help="repartir du meilleur modèle du dernier entraînement")
     ap.add_argument("--lr", type=float, default=5e-5, help="taux d'apprentissage (plus bas pour une reprise)")
+    ap.add_argument("--no-freeze", action="store_true", help="entraîner aussi le lecteur de texte (déconseillé)")
+    ap.add_argument("--fp16", action="store_true", help="calcul rapide en demi-précision")
     a = ap.parse_args()
     {"prepare": lambda: prepare(a.speaker),
-     "train": lambda: train(a.speaker, a.epochs, a.batch, a.resume, a.lr),
+     "train": lambda: train(a.speaker, a.epochs, a.batch, a.resume, a.lr, not a.no_freeze, a.fp16),
+     "check": lambda: check(a.speaker),
      "sample": lambda: sample(a.speaker)}[a.step]()

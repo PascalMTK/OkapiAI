@@ -71,7 +71,7 @@ Expressions courantes du lingala de Kinshasa (sens exact) :
 VOICE_RULE = """
 
 Conversation orale en direct (comme un appel) :
-- Réponds en 1 ou 2 phrases courtes (moins de 30 mots au total), sans listes, sans emojis ni symboles : tout est lu à voix haute.
+- Réponds en 1 phrase courte, 2 au plus (moins de 20 mots au total), sans listes, sans emojis ni symboles : tout est lu à voix haute.
 - Le plus souvent, termine par UNE question simple et naturelle sur la personne ou le sujet, pour que la conversation continue.
 - Si le message est incompréhensible ou coupé, demande gentiment de répéter, dans la langue."""
 

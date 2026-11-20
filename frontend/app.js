@@ -204,6 +204,9 @@ const modeOf = (name) => state.modes[name];
 function ensureCongolese(select) { if (!isCongolese(select.value)) select.value = "ln"; }
 
 // ---------- Langues ----------
+// Préférences du visiteur (peuvent être indisponibles : navigation privée…)
+const prefGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+const prefSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* sans importance */ } };
 function fillLangSelects() {
   const options = (filter) => state.langs.filter(filter)
     .map((l) => `<option value="${l.code}" class="bg-white dark:bg-obsidian-900 text-slate-900 dark:text-white">${esc(l.name)}</option>`).join("");
@@ -361,7 +364,12 @@ function initChat() {
     input.value = chip.textContent.trim();
     $("#chat-form").requestSubmit();
   }));
-  src.addEventListener("change", () => { convHistory.chat = []; if (modeOf("chat") === "converse") ensureCongolese(src); });
+  const savedSrc = prefGet("okapi.chatLang");
+  if (savedSrc && [...src.options].some((o) => o.value === savedSrc)) src.value = savedSrc;
+  src.addEventListener("change", () => {
+    convHistory.chat = []; if (modeOf("chat") === "converse") ensureCongolese(src);
+    prefSet("okapi.chatLang", src.value);
+  });
   const onChatMode = (mode) => {
     if (mode === "converse") ensureCongolese(src);
     input.placeholder = mode === "converse"
@@ -444,7 +452,7 @@ const extFor = (blob) => ({ "audio/ogg": "ogg", "audio/mp4": "m4a" }[blob.type] 
 // pour l'écouter. Le son est capté en continu : le début de la phrase n'est jamais perdu.
 const LIVE_RATE = 16000;            // ce que la reconnaissance vocale attend
 const LIVE_PREROLL_S = 0.6;         // son gardé avant le début détecté de la parole
-const LIVE_END_SILENCE_MS = 1100;   // fin de phrase
+const LIVE_END_SILENCE_MS = 850;    // fin de phrase (une pause plus longue est recollée par `carry`)
 const live = {
   on: false, state: "idle", lang: "auto", history: [], start: null,
   stream: null, ctx: null, mic: null, proc: null, buf: null, noise: 0.01,
@@ -542,13 +550,23 @@ function liveOnAudio(raw, ms) {
   if (!live.on) return;
   const level = liveRms(raw);
 
-  if (live.state === "speaking" || live.state === "thinking") {
+  if (live.state === "speaking") {
     // La voix d'OkapiAI revient un peu dans le micro (écho) : on apprend son niveau pour
-    // ne réagir qu'à une vraie voix, plus forte que cet écho.
+    // ne réagir qu'à une vraie voix, plus forte que cet écho. Dès que l'utilisateur parle, il se tait.
     const threshold = Math.max(0.03, live.noise * 3, live.echo * 2.5);
     if (level > threshold) live.bargeMs += ms;
     else { live.bargeMs = 0; live.echo = live.echo * 0.97 + level * 0.03; }
-    if (live.bargeMs >= 200) liveBargeIn();
+    if (live.bargeMs >= 250) liveBargeIn();
+    return;
+  }
+  if (live.state === "thinking") {
+    // Pendant la transcription, on n'interrompt jamais : sinon un bruit ou un « allô ? » annulait
+    // la demande en boucle et OkapiAI ne répondait jamais. Pendant que l'IA prépare sa réponse,
+    // l'utilisateur peut compléter sa phrase, mais il faut vraiment parler (≥ 0,7 s).
+    if (live.phase !== "answer") return;
+    if (level > Math.max(0.035, live.noise * 3.5)) live.bargeMs += ms;
+    else live.bargeMs = Math.max(0, live.bargeMs - ms);
+    if (live.bargeMs >= 700) liveBargeIn();
     return;
   }
   if (live.state === "paused") {
@@ -593,7 +611,8 @@ function liveEndUtterance() {
     const gap = new Float32Array(Math.round(0.3 * LIVE_RATE));
     pcm = liveConcat([live.carry, gap, pcm], live.carry.length + gap.length + pcm.length);
   }
-  live.carry = pcm;                        // gardée tant que la réponse n'est pas arrivée
+  // gardée tant que la réponse n'est pas arrivée (au plus 20 s, pour ne pas grossir sans fin)
+  live.carry = pcm.length <= 20 * LIVE_RATE ? pcm : null;
   liveSend(pcm);
 }
 
@@ -601,6 +620,7 @@ async function liveSend(pcm) {
   if (!live.on) return;
   const ctrl = new AbortController();
   live.request = ctrl;
+  live.phase = "transcribe";
   liveSetState("thinking", "Je transcris ce que vous avez dit…");
   liveCaption("…", "", "");
   live.echo = 0; live.bargeMs = 0;
@@ -620,6 +640,7 @@ async function liveSend(pcm) {
       return liveListen();
     }
     liveCaption(r.transcript, "", "");
+    live.phase = "answer"; live.bargeMs = 0;
     liveSetState("thinking", "OkapiAI réfléchit… (vous pouvez continuer à parler)");
     a = await api("/api/converse", { method: "POST", signal: ctrl.signal,
       json: { lang, message: r.transcript.slice(0, 1000), history: live.history.slice(-20), voice: true } });
@@ -738,7 +759,6 @@ async function liveBegin() {
   live.on = true;
   $("#live-start").classList.add("hidden");
   $("#live-end").classList.remove("hidden");
-  $("#live-lang").disabled = true;
   liveAnimate();
   try { live.start = await api(`/api/voice/start?lang=${encodeURIComponent(live.lang)}`); }
   catch { live.start = null; }
@@ -760,7 +780,6 @@ function liveStop() {
   liveCloseMic();
   $("#live-start").classList.remove("hidden");
   $("#live-end").classList.add("hidden");
-  $("#live-lang").disabled = false;
   liveSetState("idle", "Conversation terminée. Appuyez sur « Commencer » pour en démarrer une autre.");
 }
 
@@ -771,6 +790,10 @@ function liveFillLangs() {
   for (const l of state.langs.filter((x) => isCongolese(x.code) && caps.asr.includes(x.code))) opts.push([l.code, l.name]);
   $("#live-lang").innerHTML = opts.map(([v, n]) =>
     `<option value="${v}" class="bg-white dark:bg-obsidian-900 text-slate-900 dark:text-white">${esc(n)}</option>`).join("");
+  // Langue choisie la dernière fois, sinon le lingala (la détection automatique reste proposée)
+  const saved = prefGet("okapi.liveLang");
+  const pick = [saved, "ln", opts[0]?.[0]].find((v) => v && opts.some(([o]) => o === v));
+  if (pick) $("#live-lang").value = pick;
   const names = (codes) => codes.filter(isCongolese).map(langName).join(", ") || "aucune";
   $("#live-info").textContent = opts.length
     ? `Reconnaissance vocale : ${names(caps.asr)} · Voix d'OkapiAI : ${names(caps.tts)}. `
@@ -782,6 +805,13 @@ function liveFillLangs() {
 
 function initLive() {
   liveFillLangs();
+  // La langue se change aussi en pleine conversation : elle vaut dès la phrase suivante
+  $("#live-lang").addEventListener("change", (e) => {
+    prefSet("okapi.liveLang", e.target.value);
+    if (!live.on) return;
+    live.lang = e.target.value; live.carry = null;
+    showToast(`Langue de la conversation : ${e.target.selectedOptions[0]?.textContent || e.target.value}`);
+  });
   $("#live-start").addEventListener("click", liveBegin);
   $("#live-end").addEventListener("click", liveStop);
   $("#live-fr").addEventListener("change", () => liveCaption(undefined, undefined, $("#live-bot-fr").textContent));

@@ -29,6 +29,23 @@ AUTO_DOWNLOAD = os.getenv("OKAPI_ASR_AUTO_DOWNLOAD") == "1"
 # auto = carte graphique si disponible ; cpu = processeur (utile quand la carte est occupée, ~4 s/phrase)
 ASR_DEVICE = os.getenv("OKAPI_ASR_DEVICE", "auto")
 SURE = 0.92  # détection automatique : au-delà de cette confiance, inutile d'essayer l'autre langue
+# La 1re langue (le lingala) l'emporte à confiance presque égale : sur une phrase courte comme
+# « mbote », le swahili gagnait d'un cheveu (0,674 contre 0,672) avec une transcription absurde.
+PREFER = 0.05
+LEXICON_BONUS = 0.10   # la transcription lingala est faite de mots lingala connus
+
+
+def _known_lingala(lang: str, text: str) -> bool:
+    """La plupart des mots transcrits (en lingala) figurent dans le dictionnaire lingala."""
+    if lang != "ln" or not text:
+        return False
+    try:
+        from .lexicon import key, lexicon
+        words = [w for w in key(text).split() if len(w) > 1]
+        known = sum(1 for w in words if lexicon.lookup(w, fuzzy=False)[1])
+        return bool(words) and known / len(words) >= 0.5
+    except Exception:
+        return False
 MMS_LANGS = {"ln": "lin", "sw": "swh", "fr": "fra"}
 WHISPER_LANGS = {"fr": "fr", "sw": "sw", "ln": "ln"}
 WHISPER_SIZE = os.getenv("OKAPI_WHISPER_MODEL", "small")
@@ -126,15 +143,20 @@ class MMSRecognizer:
             self._load()
             if self._model is None:
                 return None, None
-            best = (None, None, -1.0)
+            results = []
             for lang in langs:
                 text, conf = self._run(audio, MMS_LANGS[lang])
-                log.info("Détection : %s -> %.3f « %s »", lang, conf, text[:60])
-                if text and conf > best[2]:
-                    best = (lang, text, conf)
-                if conf >= SURE:
+                known = _known_lingala(lang, text)
+                score = conf + (PREFER if lang == langs[0] else 0.0) + (LEXICON_BONUS if known else 0.0)
+                log.info("Détection : %s -> %.3f (score %.3f) « %s »", lang, conf, score, text[:60])
+                if text:
+                    results.append((score, lang, text))
+                if conf >= SURE or (known and conf >= 0.6):
                     break  # langue reconnue avec assurance : on gagne le temps du 2e essai
-            return best[0], best[1]
+            if not results:
+                return None, None
+            _, lang, text = max(results)
+            return lang, text
 
 
 class WhisperRecognizer:
