@@ -94,14 +94,15 @@
 
     /* Adaptive Glassmorphism utilities (Light Mode default + Dark Mode support) */
     .glass-panel {
-      background: rgba(255, 255, 255, 0.85);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
+      /* flou léger : les masques de l'arrière-plan restent visibles à travers les panneaux */
+      background: rgba(255, 255, 255, 0.80);
+      backdrop-filter: blur(2px);
+      -webkit-backdrop-filter: blur(2px);
       border: 1px solid rgba(0, 127, 255, 0.16);
       box-shadow: 0 10px 30px -5px rgba(0, 82, 180, 0.07), 0 4px 12px -2px rgba(15, 23, 42, 0.04);
     }
     .dark .glass-panel {
-      background: rgba(6, 12, 26, 0.78);
+      background: rgba(6, 12, 26, 0.74);
       border: 1px solid rgba(0, 127, 255, 0.18);
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     }
@@ -143,10 +144,11 @@
     }
 
     /* ---------- Masques congolais en arrière-plan ---------- */
-    :root { --mask-color: #7c2d12; --mask-opacity: .055; }
-    .dark { --mask-color: #fcd34d; --mask-opacity: .05; }
+    :root { --mask-color: #7c2d12; --mask-opacity: .14; }
+    .dark { --mask-color: #fcd34d; --mask-opacity: .10; }
     .heritage-layer { color: var(--mask-color); }
-    .heritage-mask { position: absolute; opacity: var(--mask-opacity); animation: mask-float 14s ease-in-out infinite; }
+    .heritage-mask { position: absolute; opacity: calc(var(--mask-opacity) * var(--k, 1)); animation: mask-float 14s ease-in-out infinite; }
+    .heritage-mask.still { animation: none; transform: rotate(var(--r, 0deg)); }
     .heritage-mask svg { width: 100%; height: 100%; }
     .heritage-mask:nth-child(2n) { animation-duration: 18s; animation-delay: -6s; }
     .heritage-mask:nth-child(3n) { animation-duration: 22s; animation-delay: -11s; }
@@ -192,12 +194,42 @@
         <feDisplacementMap in="SourceGraphic" in2="n" scale="3.2"/>
       </filter>
     </svg>
-    <div class="heritage-mask" style="--r:-8deg; left:-2rem; top:9rem; width:13rem; height:21rem;"><svg viewBox="0 0 160 260"><use href="/assets/masques.svg#masque-songye"/></svg></div>
-    <div class="heritage-mask" style="--r:7deg; right:-1.5rem; top:12rem; width:12rem; height:18rem;"><svg viewBox="0 0 160 240"><use href="/assets/masques.svg#masque-kuba"/></svg></div>
-    <div class="heritage-mask hidden md:block" style="--r:5deg; left:3%; bottom:-2rem; width:11rem; height:18rem;"><svg viewBox="0 0 160 260"><use href="/assets/masques.svg#masque-pende"/></svg></div>
-    <div class="heritage-mask hidden md:block" style="--r:-6deg; right:4%; bottom:-1rem; width:10rem; height:15rem;"><svg viewBox="0 0 160 230"><use href="/assets/masques.svg#masque-luba"/></svg></div>
-    <div class="heritage-mask hidden lg:block" style="--r:-4deg; left:46%; bottom:-5rem; width:9rem; height:12rem;"><svg viewBox="0 0 160 210"><use href="/assets/masques.svg#masque-lega"/></svg></div>
+    <div id="heritage-masks"></div>
   </div>
+  <script>
+    // Beaucoup de masques sur tout l'écran : grille décalée (toujours la même disposition), recalculée
+    // quand la fenêtre change de taille.
+    (function () {
+      const KINDS = [["songye", 260], ["kuba", 240], ["pende", 260], ["luba", 230], ["lega", 210]];
+      const box = document.getElementById("heritage-masks");
+      function draw() {
+        let seed = 7;
+        const rnd = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+        const w = innerWidth, h = innerHeight;
+        const cw = w < 640 ? 150 : 210, ch = w < 640 ? 200 : 250;   // taille d'une case (px)
+        const cols = Math.ceil(w / cw) + 1, rows = Math.ceil(h / ch) + 1;
+        let html = "", i = 0;
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++, i++) {
+            const [kind, vh] = KINDS[(c * 2 + r * 3 + (r % 2)) % KINDS.length];
+            const mw = (w < 640 ? 70 : 95) + rnd() * 55;            // largeur du masque (px)
+            const x = (c - 0.5 + (r % 2) * 0.5) * cw + rnd() * cw * 0.35;
+            const y = (r - 0.5) * ch + rnd() * ch * 0.3;
+            const rot = (rnd() * 24 - 12).toFixed(1);
+            const op = (0.75 + rnd() * 0.5).toFixed(2);              // intensité légèrement variée
+            const anim = i % 3 === 0 ? "" : " still";
+            html += `<div class="heritage-mask${anim}" style="--r:${rot}deg;--k:${op};left:${x.toFixed(0)}px;top:${y.toFixed(0)}px;` +
+                    `width:${mw.toFixed(0)}px;height:${(mw * vh / 160).toFixed(0)}px"><svg viewBox="0 0 160 ${vh}">` +
+                    `<use href="/assets/masques.svg#masque-${kind}"/></svg></div>`;
+          }
+        }
+        box.innerHTML = html;
+      }
+      let t;
+      addEventListener("resize", () => { clearTimeout(t); t = setTimeout(draw, 200); });
+      draw();
+    })();
+  </script>
 
   <!-- Toast Notification Container -->
   <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
