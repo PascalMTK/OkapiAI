@@ -23,7 +23,7 @@ from ..models import DIALOGUE, TRADUCTION, TrainingEntry
 from ..similarity import normalize, similarity
 from . import translator
 from .basics import basic_reply
-from .corpus import corpus
+from .corpus import corpus, corpus_lua
 from .lexicon import key, lexicon
 from .llm import claude_chat
 
@@ -223,6 +223,8 @@ def converse(db: Session, lang: str, message: str, history: list[dict], voice: b
     examples = grounding_examples(db, lang, query)
     if lang == "ln":
         examples += lexicon.examples_for(message) + corpus.examples_for_ai(message)
+    elif lang == "lua":
+        examples += corpus_lua.examples_for_ai(message, k=4)
     ai = claude_chat.reply(lang, message, history, examples, voice=voice)
     if ai:
         out.update(reply=ai["reply"], reply_fr=ai["reply_fr"], method="ia")

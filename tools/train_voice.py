@@ -16,11 +16,13 @@ Résultat : backend/models/voix-<speaker>/run-*/checkpoint_*.pth ; `check` fait 
 """
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
 import unicodedata
 from pathlib import Path
+from typing import Optional
 
 ROOT = Path(__file__).resolve().parent.parent
 LRSC = ROOT / "dataset" / "sources" / "lrsc"
@@ -32,6 +34,24 @@ TEST_SENTENCES = [
     "na kinshasa bato balingaka fufu mingi elongo na madesu",
     "kombo na ngai okapiai nazali mosungi na yo ya lingala",
 ]
+# Voix entraînables : locuteur -> langue. « tshiluba » = voix tshiluba (corpus abdouaziz/tshiluba)
+LANG_OF = {"tshiluba": "lua"}
+SENTENCES = {
+    "ln": TEST_SENTENCES,
+    "lua": ["moyo webe udi muimpe ndi muimpe tuasakidila bikole",
+            "muana wanyi udi kuenda ku kalasa lelu",
+            "dina dianyi ndi okapiai ndi musue kukuambuluisha"],
+}
+CHECK_EXTRA = {
+    "ln": ["lobi tokokende na zando kosomba mbisi mpe pondu", "mama azali kolamba bilei na ndako",
+           "olingi tosolola likambo nini lelo"],
+    "lua": ["shala bimpe tuamonangana", "ndi musue kulonga tshiluba", "bantu ba bungi badi mu nzubu"],
+}
+TSHILUBA_VOIX = Path(os.getenv("OKAPI_TSHILUBA_VOIX", "D:/okapi-data/tshiluba-voix")) / "data"
+
+
+def lang_of(speaker: str) -> str:
+    return LANG_OF.get(speaker, "ln")
 
 
 def out_dir(speaker: str) -> Path:
@@ -59,7 +79,50 @@ def ffmpeg() -> str:
         return "ffmpeg"
 
 
-def prepare(speaker: str) -> None:
+def prepare_parquet(speaker: str, max_clips: int) -> None:
+    """Voix tshiluba : enregistrements du corpus abdouaziz/tshiluba (fichiers parquet), un seul lecteur."""
+    import wave
+    import pyarrow.parquet as pq
+    data = out_dir(speaker) / "data"
+    (data / "wavs").mkdir(parents=True, exist_ok=True)
+    trim = ("silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.05,areverse,"
+            "silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.05,areverse")
+    lines, skipped, seconds = [], 0, 0.0
+    files = sorted(TSHILUBA_VOIX.glob("*.parquet"))
+    if not files:
+        sys.exit(f"Aucun fichier parquet dans {TSHILUBA_VOIX}")
+    for f in files:
+        for i, row in enumerate(pq.read_table(f).to_pylist()):
+            if len(lines) >= max_clips:
+                break
+            text = clean_text(row.get("transcription") or "")
+            audio = (row.get("audio") or {}).get("bytes")
+            # Un seul lecteur : les fichiers « Line-*.wav » (voix d'homme régulière, 44-48 kHz) ;
+            # les clips Common Voice (« common_voice_lua_* ») mélangent beaucoup de voix.
+            if not str((row.get("audio") or {}).get("path") or "").startswith("Line-"):
+                continue
+            if not text or not audio:
+                skipped += 1
+                continue
+            uid = f"{f.stem.split('-')[0]}_{i:05d}"
+            dst = data / "wavs" / f"{uid}.wav"
+            if not dst.exists():
+                subprocess.run([ffmpeg(), "-nostdin", "-loglevel", "error", "-y", "-i", "-", "-af", trim, "-ac", "1",
+                                "-ar", str(RATE), "-sample_fmt", "s16", str(dst)], input=audio, check=True)
+            with wave.open(str(dst)) as w:
+                dur = w.getnframes() / w.getframerate()
+            if not 0.8 <= dur <= 12:      # trop court, ou trop long pour la carte de 4 Go
+                skipped += 1
+                continue
+            seconds += dur
+            lines.append(f"{uid}|{text}|{text}")
+    (data / "metadata.csv").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"{speaker} : {len(lines)} phrases, {seconds / 60:.1f} min ({skipped} écartées) -> {data}")
+
+
+def prepare(speaker: str, max_clips: int = 100000) -> None:
+    if lang_of(speaker) == "lua":
+        return prepare_parquet(speaker, max_clips)
     rows = [json.loads(l) for l in (LRSC / "metadata.jsonl").read_text(encoding="utf-8").splitlines() if l.strip()]
     rows = [r for r in rows if r["speaker_id"] == speaker]
     data = out_dir(speaker) / "data"
@@ -96,7 +159,10 @@ def base_files():
 
 
 def train(speaker: str, epochs: int, batch: int, resume: bool = False, lr: float = 5e-5,
-          freeze_text: bool = True, fp16: bool = False) -> None:
+          freeze_text: Optional[bool] = None, fp16: bool = False) -> None:
+    lang = lang_of(speaker)
+    if freeze_text is None:   # nouvelle langue : le lecteur de texte doit apprendre ses sons
+        freeze_text = lang == "ln"
     from trainer import Trainer, TrainerArgs
     from TTS.config.shared_configs import BaseDatasetConfig
     from TTS.tts.configs.vits_config import VitsConfig
@@ -111,7 +177,7 @@ def train(speaker: str, epochs: int, batch: int, resume: bool = False, lr: float
     config = VitsConfig()
     config.load_json(cfg_path)
     config.datasets = [BaseDatasetConfig(formatter="ljspeech", path=str(data), meta_file_train="metadata.csv",
-                                         language="ln")]
+                                         language=lang)]
     config.output_path = str(out_dir(speaker))
     config.run_name = f"run-{speaker}"
     config.batch_size, config.eval_batch_size = batch, batch
@@ -119,7 +185,7 @@ def train(speaker: str, epochs: int, batch: int, resume: bool = False, lr: float
     config.lr_gen = config.lr_disc = lr            # affinage : pas trop fort pour ne pas tout oublier
     config.run_eval = True
     config.test_delay_epochs = 0
-    config.test_sentences = [[s] for s in TEST_SENTENCES]
+    config.test_sentences = [[s] for s in SENTENCES[lang]]
     # Précision complète par défaut (en fp16, quelques pas partent en NaN) ; --fp16 est ~5x plus
     # rapide sur une carte de 4 Go, et les pas en NaN sont simplement ignorés.
     config.mixed_precision = fp16
@@ -164,7 +230,7 @@ def sample(speaker: str) -> None:
     dst = ROOT / "comparaison-voix"
     dst.mkdir(exist_ok=True)
     import wave
-    for i, s in enumerate(TEST_SENTENCES, 1):
+    for i, s in enumerate(SENTENCES[lang_of(speaker)], 1):
         wav = np.asarray(synth.tts(s, split_sentences=True), dtype=np.float32)
         with wave.open(str(dst / f"p{i}_florent.wav" if speaker == "florent" else dst / f"p{i}_{speaker}.wav"), "wb") as w:
             w.setnchannels(1)
@@ -174,18 +240,16 @@ def sample(speaker: str) -> None:
     print(f"Échantillons ({model.name}) -> {dst}")
 
 
-CHECK_SENTENCES = TEST_SENTENCES + ["lobi tokokende na zando kosomba mbisi mpe pondu",
-                                    "mama azali kolamba bilei na ndako", "olingi tosolola likambo nini lelo"]
 MAX_CER = 0.12   # au-delà, la voix est jugée trop difficile à comprendre
 ASR_URL = "http://127.0.0.1:8000/api/voice/transcribe"
 
 
-def _asr(wav_bytes: bytes) -> str:
+def _asr(wav_bytes: bytes, lang: str = "ln") -> str:
     """Ce que la reconnaissance vocale d'OkapiAI (backend lancé) entend dans un WAV."""
     import urllib.request
     import uuid
     b = uuid.uuid4().hex
-    head = (f'--{b}\r\nContent-Disposition: form-data; name="lang"\r\n\r\nln\r\n--{b}\r\n'
+    head = (f'--{b}\r\nContent-Disposition: form-data; name="lang"\r\n\r\n{lang}\r\n--{b}\r\n'
             'Content-Disposition: form-data; name="audio"; filename="a.wav"\r\nContent-Type: audio/wav\r\n\r\n')
     body = head.encode() + wav_bytes + f"\r\n--{b}--\r\n".encode()
     req = urllib.request.Request(ASR_URL, body, {"Content-Type": f"multipart/form-data; boundary={b}"})
@@ -218,7 +282,7 @@ def check(speaker: str) -> None:
         synth = Synthesizer(tts_checkpoint=str(ck), tts_config_path=str(run / "config.json"),
                             use_cuda=torch.cuda.is_available())
         errs = []
-        for s in CHECK_SENTENCES:
+        for s in SENTENCES[lang_of(speaker)] + CHECK_EXTRA[lang_of(speaker)]:
             torch.manual_seed(0)
             wav = np.asarray(synth.tts(s), dtype=np.float32)
             buf = io.BytesIO()
@@ -227,7 +291,7 @@ def check(speaker: str) -> None:
                 w.setsampwidth(2)
                 w.setframerate(synth.output_sample_rate)
                 w.writeframes((np.clip(wav, -1, 1) * 32767).astype("<i2").tobytes())
-            errs.append(_cer(s, _asr(buf.getvalue())))
+            errs.append(_cer(s, _asr(buf.getvalue(), lang_of(speaker))))
         scores[ck.name] = sum(errs) / len(errs)
         print(f"{ck.name:22} lettres mal comprises : {scores[ck.name]:.0%}", flush=True)
         del synth
@@ -252,10 +316,11 @@ if __name__ == "__main__":
     ap.add_argument("--batch", type=int, default=8)
     ap.add_argument("--resume", action="store_true", help="repartir du meilleur modèle du dernier entraînement")
     ap.add_argument("--lr", type=float, default=5e-5, help="taux d'apprentissage (plus bas pour une reprise)")
-    ap.add_argument("--no-freeze", action="store_true", help="entraîner aussi le lecteur de texte (déconseillé)")
+    ap.add_argument("--no-freeze", action="store_true", help="entraîner aussi le lecteur de texte (lingala : déconseillé)")
+    ap.add_argument("--max-clips", type=int, default=100000, help="prepare : nombre maximum de phrases")
     ap.add_argument("--fp16", action="store_true", help="calcul rapide en demi-précision")
     a = ap.parse_args()
-    {"prepare": lambda: prepare(a.speaker),
-     "train": lambda: train(a.speaker, a.epochs, a.batch, a.resume, a.lr, not a.no_freeze, a.fp16),
+    {"prepare": lambda: prepare(a.speaker, a.max_clips),
+     "train": lambda: train(a.speaker, a.epochs, a.batch, a.resume, a.lr, False if a.no_freeze else None, a.fp16),
      "check": lambda: check(a.speaker),
      "sample": lambda: sample(a.speaker)}[a.step]()

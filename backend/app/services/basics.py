@@ -72,6 +72,24 @@ BASICS: dict[str, list[tuple[list[str], str, str]]] = {
         (["asante", "asante sana", "merci"], "Karibu !", "De rien !"),
         (["kwa heri", "tutaonana", "au revoir"], "Kwa heri ! Tutaonana.", "Au revoir ! À bientôt."),
     ],
+    # Tshiluba (ciluba du Kasaï). Formes courantes, à faire relire par des locuteurs natifs :
+    # le bouton « Corriger » de l'interface permet d'en proposer de meilleures.
+    "lua": [
+        (["moyo", "moyo webe", "moyo wenu", "moyo okapi", "bonjour", "salut"],
+         "Moyo webe ! Udi muimpe ?", "Bonjour ! Tu vas bien ?"),
+        (["udi muimpe", "udi bimpe", "moyo udi muimpe", "moyo udi bimpe", "bualu kayi"],
+         "Ndi muimpe, tuasakidila. Ne wewe ?", "Je vais bien, merci. Et toi ?"),
+        (["ndi muimpe", "ndi bimpe", "muimpe", "bimpe", "ndi muimpe tuasakidila", "ndi muimpe ne wewe"],
+         "Bimpe bikole ! Udi musue kulonga tshinyi lelu ?", "Très bien ! Que veux-tu apprendre aujourd'hui ?"),
+        (["dina diebe nganyi", "wewe nganyi", "udi nganyi"],
+         "Dîna dianyi ndi OkapiAI. Ne wewe, dîna diebe nganyi ?", "Je m'appelle OkapiAI. Et toi, comment t'appelles-tu ?"),
+        (["tuasakidila", "tuasakidila bikole", "merci"], "Kakuena bualu !", "De rien !"),
+        (["shala bimpe", "ya bimpe", "tuamonangana", "au revoir"],
+         "Shala bimpe ! Tuamonangana.", "Au revoir ! À bientôt."),
+        (["ndi ne nzala"], "Udi ne nzala ? Udi musue kudia tshinyi ?", "Tu as faim ? Que veux-tu manger ?"),
+        (["tshiena mumvue", "tshiena mumvue bimpe"],
+         "Kakuena bualu. Tuyukile bitekete.", "Pas de souci. Parlons doucement."),
+    ],
 }
 
 _NAME = {

@@ -22,14 +22,22 @@ from .lexicon import key, lexicon
 log = logging.getLogger("okapiai.hearing")
 
 LRSC = DATASET_DIR / "sources" / "lrsc" / "metadata.jsonl"
+# Phrases tshiluba (textes publics + transcriptions d'enregistrements), voir tools/import_tshiluba.py
+TSHILUBA = DATASET_DIR / "sources" / "tshiluba" / "phrases.jsonl"
 PHRASE_CUTOFF = 0.82   # ressemblance minimale pour reconnaître une phrase courante entière
 
 
-def soft(text: str) -> str:
+def soft(text: str, lang: str = "ln") -> str:
     """Forme « d'oreille » : ce qu'un apprenant confond devient identique."""
     t = key(text)
-    t = t.replace("ou", "u").replace("ch", "s").replace("sh", "s").replace("qu", "k").replace("q", "k")
-    t = re.sub(r"c(?=[aou])", "k", t)
+    if lang == "lua":
+        # tshiluba = ciluba : « tsh » et « c » notent le même son ; l devient d devant i (dina/lina)
+        t = t.replace("tsh", "c").replace("ch", "c")
+        t = re.sub(r"l(?=i)", "d", t)
+    t = t.replace("ou", "u").replace("sh", "s").replace("qu", "k").replace("q", "k")
+    if lang != "lua":
+        t = t.replace("ch", "s")
+        t = re.sub(r"c(?=[aou])", "k", t)
     t = t.replace("r", "l").replace("y", "i").replace("w", "u")
     t = re.sub(r"gu(?=[ie])", "g", t)             # « mingui », « mingwi » = mingi
     t = re.sub(r"[mn](?=[bdgkpstvzfj])", "", t)   # mb, nd, ng, nz, nk… : la nasale s'entend peu
@@ -44,7 +52,8 @@ _SUFFIXES = ("aki", "ake", "aka", "ki", "i", "a", "e", "")
 
 
 class Hearing:
-    def __init__(self):
+    def __init__(self, lang: str = "ln"):
+        self.lang = lang
         self._lock = threading.Lock()
         self._freq: Optional[Counter] = None        # mot -> fréquence
         self._by_soft: dict[str, str] = {}          # forme d'oreille -> mot le plus fréquent
@@ -57,33 +66,42 @@ class Hearing:
                 return
             from .basics import BASICS
             freq: Counter = Counter()
-            if LRSC.exists():
-                for line in LRSC.read_text(encoding="utf-8").splitlines():
+            corpus, field = (LRSC, "lingala") if self.lang == "ln" else (TSHILUBA, "text")
+            if corpus.exists():
+                for line in corpus.read_text(encoding="utf-8").splitlines():
                     if line.strip():
-                        freq.update(key(json.loads(line).get("lingala", "")).split())
+                        freq.update(key(json.loads(line).get(field, "")).split())
+            freq["okapiai"] += 100   # le nom du bot, dans toutes les langues
             phrases = []
-            for triggers, reply, _ in BASICS.get("ln", []):
+            for triggers, reply, _ in BASICS.get(self.lang, []):
                 for t in triggers:
                     freq.update({w: 50 for w in key(t).split()})   # mots de tous les jours
                     if len(t.split()) >= 2:
-                        phrases.append((soft(t), key(t)))
+                        phrases.append((self._soft(t), key(t)))
                 freq.update({w: 20 for w in key(reply).split()})
             lexicon._load()
-            for k in lexicon._ln:
-                if " " not in k and k.isalpha():
-                    freq[k] += 1
+            if self.lang == "ln":
+                for k in lexicon._ln:
+                    if " " not in k and k.isalpha():
+                        freq[k] += 1
             # Le lingala parlé mélange du français (« malade », « université ») : ces mots-là
             # ne sont pas des fautes de prononciation.
             from .lexicon import COMMON_FR
             french = {w for k in list(lexicon._fr) + list(COMMON_FR) for w in key(k).split() if len(w) > 2}
             by_soft: dict[str, str] = {}
             for w, _ in freq.most_common():             # le plus fréquent gagne
-                by_soft.setdefault(soft(w), w)
+                by_soft.setdefault(self._soft(w), w)
             self._freq, self._by_soft, self._phrases, self._french = freq, by_soft, phrases, french - set(freq)
-            log.info("Écoute tolérante : %d mots, %d phrases courantes", len(freq), len(phrases))
+            log.info("Écoute tolérante (%s) : %d mots, %d phrases courantes", self.lang, len(freq), len(phrases))
+
+    def _soft(self, text: str) -> str:
+        return soft(text, self.lang)
 
     def _known_verb(self, w: str) -> bool:
-        """Forme conjuguée d'un verbe connu (ko + racine dans le vocabulaire ou le dictionnaire)."""
+        """Forme conjuguée d'un verbe connu (ko + racine dans le vocabulaire ou le dictionnaire).
+        Lingala seulement : en tshiluba, le corpus (27 000 phrases) contient déjà les formes conjuguées."""
+        if self.lang != "ln":
+            return False
         for p in _PREFIXES:
             if not w.startswith(p) or len(w) - len(p) < 2:
                 continue
@@ -108,13 +126,18 @@ class Hearing:
     def _word(self, w: str) -> str:
         if self._known(w):
             return w
-        s = soft(w)
+        s = self._soft(w)
         if s in self._by_soft:
             return self._by_soft[s]
         if len(s) < 4:              # trop court pour deviner sans risque
             return w
-        close = get_close_matches(s, [k for k in self._by_soft if abs(len(k) - len(s)) <= 2],
-                                  n=5, cutoff=0.8 if len(s) >= 6 else 0.84)
+        # Tshiluba : vocabulaire immense (Bible) où chaque mot a un voisin proche ; on ne
+        # rapproche donc que vers des mots courants, et de plus près.
+        strict = self.lang != "ln"
+        pool = [k for k in self._by_soft if abs(len(k) - len(s)) <= 2
+                and (not strict or self._freq[self._by_soft[k]] >= 5)]
+        close = get_close_matches(s, pool, n=5, cutoff=(0.86 if strict else 0.8) if len(s) >= 6
+                                  else (0.9 if strict else 0.84))
         if not close:
             return w
         # même début de mot d'abord (on entend surtout mal le milieu et la fin), puis la
@@ -145,7 +168,7 @@ class Hearing:
         fixed = " ".join(out)
         # phrase courante entière (salutations, questions de base), seulement s'il reste un mot
         # incompris : une phrase faite de mots connus garde son sens (« tolei » ≠ « olei »)
-        s = soft(fixed) if not all(self._known(w) for w in out) else ""
+        s = self._soft(fixed) if not all(self._known(w) for w in out) else ""
         best, score = None, 0.0
         for ps, phrase in self._phrases:
             if abs(len(ps) - len(s)) <= max(3, len(ps) // 3):
@@ -159,4 +182,10 @@ class Hearing:
         return {"text": fixed if fixed != key(heard) else heard, "heard": heard, "fixes": fixes}
 
 
-hearing = Hearing()
+hearing = Hearing("ln")
+_BY_LANG = {"ln": hearing, "lua": Hearing("lua")}
+
+
+def for_lang(lang: str) -> Optional[Hearing]:
+    """L'écoute tolérante d'une langue, si on a son vocabulaire."""
+    return _BY_LANG.get(lang)

@@ -13,7 +13,7 @@ from ..schemas import ChatTurn, ConverseIn, TranslateIn, check_langs
 from ..services import conversation, translator
 from ..services.audio import save_audio
 from ..services.corpus import corpus
-from ..services.hearing import hearing
+from ..services.hearing import for_lang as hearing_for
 from ..services.speech import recognizer
 from ..services.tts import MAX_CHARS, synthesizer
 
@@ -22,12 +22,13 @@ AUTO = "auto"  # voix live : détecter la langue nationale parlée
 
 
 def _understand(transcript, lang: str) -> dict:
-    """Écoute tolérante (lingala) : la phrase comprise, plus ce qui a été réellement entendu
+    """Écoute tolérante (lingala, tshiluba) : la phrase comprise, plus ce qui a été réellement entendu
     (`heard`) et les mots rapprochés (`fixes`), pour montrer la bonne forme à l'apprenant."""
-    if not transcript or lang != "ln":
+    h = hearing_for(lang)
+    if not transcript or h is None:
         return {"transcript": transcript, "heard": transcript, "fixes": []}
     try:
-        r = hearing.correct(transcript)
+        r = h.correct(transcript)
         return {"transcript": r["text"], "heard": r["heard"], "fixes": r["fixes"]}
     except Exception:  # jamais bloquant : on garde ce qui a été entendu
         return {"transcript": transcript, "heard": transcript, "fixes": []}
@@ -75,10 +76,13 @@ GREETINGS = {
            "Bonjour ! Je suis OkapiAI. Tu vas bien ? De quoi veux-tu qu'on parle aujourd'hui ?"),
     "sw": ("Habari ! Mimi ni OkapiAI. Habari yako ? Ungependa tuzungumze kuhusu nini leo ?",
            "Bonjour ! Je suis OkapiAI. Comment vas-tu ? De quoi aimerais-tu qu'on parle aujourd'hui ?"),
+    "lua": ("Moyo webe ! Ndi OkapiAI. Udi muimpe ? Udi musue tuyukile bua tshinyi lelu ?",
+            "Bonjour ! Je suis OkapiAI. Tu vas bien ? De quoi veux-tu qu'on parle aujourd'hui ?"),
 }
 RETRY = {  # quand la voix n'a pas été comprise
     "ln": ("Nayoki yo malamu te. Loba lisusu ?", "Je ne t'ai pas bien entendu. Tu peux répéter ?"),
     "sw": ("Sikusikia vizuri. Rudia tafadhali ?", "Je ne t'ai pas bien entendu. Tu peux répéter ?"),
+    "lua": ("Tshiena mumvue bimpe. Amba kabidi ?", "Je ne t'ai pas bien entendu. Tu peux répéter ?"),
 }
 
 

@@ -798,9 +798,10 @@ function liveFillLangs() {
   const pick = [saved, "ln", opts[0]?.[0]].find((v) => v && opts.some(([o]) => o === v));
   if (pick) $("#live-lang").value = pick;
   const names = (codes) => codes.filter(isCongolese).map(langName).join(", ") || "aucune";
+  const missing = state.langs.map((l) => l.code).filter((c) => isCongolese(c) && !caps.asr.includes(c));
   $("#live-info").textContent = opts.length
     ? `Reconnaissance vocale : ${names(caps.asr)} · Voix d'OkapiAI : ${names(caps.tts)}. `
-      + "Le kikongo et le tshiluba n'ont pas encore de modèle vocal : utilisez le chat écrit."
+      + (missing.length ? `${missing.map(langName).join(" et ")} : pas encore de modèle vocal, utilisez le chat écrit.` : "")
     : "La reconnaissance vocale n'est pas disponible sur ce serveur : utilisez le chat écrit.";
   $("#live-start").disabled = !opts.length;
   $("#live-start").classList.toggle("opacity-50", !opts.length);

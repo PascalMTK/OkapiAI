@@ -66,6 +66,19 @@ Expressions courantes du lingala de Kinshasa (sens exact) :
 - nalembi = je suis fatigué ; nazali na mpasi = j'ai mal / je souffre ; nazali na esengo = je suis content
 - nayoki te / nasosoli te = je n'ai pas compris ; loba lisusu = répète ; loba malembe = parle doucement
 - lobela ngai = raconte-moi / dis-moi ; nalingi yo = je t'aime ; lelo = aujourd'hui ; lobi = demain ou hier (selon le temps du verbe)""",
+    "lua": """
+
+Expressions courantes du tshiluba (ciluba du Kasaï) :
+- moyo / moyo webe = bonjour (à toi) ; moyo wenu = bonjour (à vous) ; udi muimpe ? = tu vas bien ? ; ndi muimpe = je vais bien
+- tuasakidila = merci ; tuasakidila bikole = merci beaucoup ; kakuena bualu = de rien / pas de problème ; ne wewe ? = et toi ?
+- eyowa = oui ; tòo = non ; bimpe = bien ; bikole = beaucoup / très
+- dîna diebe nganyi ? = comment t'appelles-tu ? ; dîna dianyi ndi … = je m'appelle …
+- shala bimpe = au revoir (reste bien) ; ya bimpe = va bien ; tuamonangana = à bientôt
+- ndi ne nzala = j'ai faim ; tshiena mumvue = je n'ai pas compris ; amba kabidi = redis / répète
+- udi musue … ? = veux-tu … ? ; ndi musue … = je veux … ; lelu = aujourd'hui ; tshinyi = quoi ; kuepi = où
+Les exemples de phrases tshiluba fournis viennent surtout de la Bible : prends-y l'orthographe et
+les conjugaisons, mais parle comme dans la vie de tous les jours (pas de Yehowa, Nzambi ni tournures
+bibliques sauf si l'utilisateur en parle).""",
 }
 
 VOICE_RULE = """

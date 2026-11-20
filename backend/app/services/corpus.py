@@ -6,6 +6,9 @@ Elles servent :
   - de modèles de « vrai lingala » envoyés à l'IA avec chaque message (vocabulaire, tournures) ;
   - d'exemples d'usage, avec l'enregistrement du locuteur, quand on demande le sens d'un mot.
 Le corpus n'a pas de traduction française.
+
+Tshiluba : même principe avec dataset/sources/tshiluba/phrases.jsonl (tools/import_tshiluba.py,
+27 000 phrases surtout bibliques, CC BY 4.0), sans enregistrements.
 """
 import json
 import logging
@@ -26,7 +29,9 @@ _AUDIO = re.compile(r"^(train|validation|test)/[A-Za-z0-9_.-]+\.wav$")
 
 
 class Corpus:
-    def __init__(self):
+    def __init__(self, meta=LRSC_DIR / "metadata.jsonl", field: str = "lingala", source: str = SOURCE,
+                 language: str = "lingala"):
+        self.meta, self.field, self.source, self.language = meta, field, source, language
         self._lock = threading.Lock()
         self._rows: Optional[list[dict]] = None
         self._index: dict[str, list[int]] = {}
@@ -37,13 +42,13 @@ class Corpus:
             if self._rows is not None:
                 return
             rows: list[dict] = []
-            meta = LRSC_DIR / "metadata.jsonl"
+            meta = self.meta
             if meta.exists():
                 for line in meta.read_text(encoding="utf-8").splitlines():
                     if not line.strip():
                         continue
                     r = json.loads(line)
-                    text = (r.get("lingala") or "").strip()
+                    text = (r.get(self.field) or "").strip()
                     if len(text.split()) < 3:  # trop court pour servir d'exemple
                         continue
                     audio = (r.get("audio") or "").removeprefix("sources/lrsc/")
@@ -57,7 +62,7 @@ class Corpus:
             n = max(1, len(rows))
             self._idf = {t: math.log(1 + n / len(ids)) for t, ids in index.items()}
             self._index, self._rows = dict(index), rows
-            log.info("Corpus LRSC : %d phrases, %d mots", len(rows), len(index))
+            log.info("Corpus %s : %d phrases, %d mots", self.language, len(rows), len(index))
 
     def size(self) -> int:
         self._load()
@@ -92,7 +97,8 @@ class Corpus:
         return self._public(self._rows[best])
 
     def examples_for_ai(self, text: str, k: int = 6) -> list[dict]:
-        return [{"texte": r["text"], "sens": f"(phrase en lingala correct, {SOURCE})"} for r in self.search(text, k)]
+        return [{"texte": r["text"], "sens": f"(phrase en {self.language} correct, {self.source})"}
+                for r in self.search(text, k)]
 
     def audio_path(self, rel: str):
         """Chemin d'un enregistrement du corpus, ou None (nom invalide / fichier absent)."""
@@ -101,12 +107,13 @@ class Corpus:
         path = (LRSC_DIR / rel).resolve()
         return path if path.is_file() and LRSC_DIR.resolve() in path.parents else None
 
-    @staticmethod
-    def _public(r: dict) -> dict:
+    def _public(self, r: dict) -> dict:
         # l'audio n'est pas versionné (git) : on ne propose l'écoute que si le fichier est là
         has_audio = bool(r["audio"]) and (LRSC_DIR / r["audio"]).is_file()
-        return {"text": r["text"], "source": SOURCE,
+        return {"text": r["text"], "source": self.source,
                 "audio_url": f"/api/corpus/audio/{r['audio']}" if has_audio else None}
 
 
 corpus = Corpus()
+corpus_lua = Corpus(DATASET_DIR / "sources" / "tshiluba" / "phrases.jsonl", "text",
+                    "corpus DanMM96, CC BY 4.0, surtout biblique", "tshiluba")

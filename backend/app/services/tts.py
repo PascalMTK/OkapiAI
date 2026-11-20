@@ -4,7 +4,9 @@ Voix Meta MMS-TTS (VITS) :
   - lingala : khof312/mms-tts-lin  (MMS converti pour transformers)
   - swahili : facebook/mms-tts-swh
 Licence des voix MMS : CC BY-NC 4.0 (usage non commercial).
-Le kikongo et le tshiluba n'ont pas encore de voix publique.
+Le kikongo et le tshiluba n'ont pas encore de voix publique. En attendant une voix tshiluba
+entraînée, le tshiluba est lu par la voix lingala (même alphabet, sons bantous proches) ;
+OKAPI_TTS_LUA=off la désactive.
 
 Les fichiers générés sont mis en cache dans AUDIO_DIR/tts/ (même texte = même fichier).
 Comme pour la reconnaissance, une voix n'est utilisée que si elle est déjà téléchargée
@@ -28,10 +30,14 @@ VOICES = {
     "ln": os.getenv("OKAPI_TTS_LN", "khof312/mms-tts-lin"),
     "sw": os.getenv("OKAPI_TTS_SW", "facebook/mms-tts-swh"),
 }
+if os.getenv("OKAPI_TTS_LUA", "") != "off":
+    VOICES["lua"] = os.getenv("OKAPI_TTS_LUA") or VOICES["ln"]   # voix provisoire : la voix lingala
 # Voix externes (ex. voix affinée sur notre dataset, tools/voice_server.py) : OKAPI_TTS_<LANG>_URL.
 # Utilisées en priorité ; si elles ne répondent pas, on revient à la voix MMS.
-REMOTE = {lang: url.rstrip("/") for lang in ("ln", "sw")
+REMOTE = {lang: url.rstrip("/") for lang in ("ln", "sw", "lua")
           if (url := os.getenv(f"OKAPI_TTS_{lang.upper()}_URL"))}
+if "lua" in VOICES and "lua" not in REMOTE and "ln" in REMOTE:
+    REMOTE["lua"] = REMOTE["ln"]
 AUTO_DOWNLOAD = os.getenv("OKAPI_TTS_AUTO_DOWNLOAD") == "1"
 ENABLED = os.getenv("OKAPI_TTS", "on") != "off"
 TTS_DIR = AUDIO_DIR / "tts"

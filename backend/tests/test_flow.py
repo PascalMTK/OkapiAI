@@ -394,6 +394,13 @@ def test_learner_hearing():
                "olingi tosolola likambo nini lelo"):
         r = hearing.correct(ok)
         assert r["text"] == ok and not r["fixes"], (ok, r)
+    # tshiluba : mêmes principes (tsh/c, l/d devant i, r/l, nz/z)
+    from app.services.hearing import for_lang
+    lua = for_lang("lua")
+    for heard, meant in {"tuasakidila bikore": "tuasakidila bikole", "lina dyebe nganyi": "dina diebe nganyi",
+                         "shara bimpe": "shala bimpe"}.items():
+        assert lua.correct(heard)["text"] == meant, (heard, lua.correct(heard))
+    assert lua.correct("moyo udi muimpe")["text"] == "moyo udi muimpe"
 
 
 if __name__ == "__main__":

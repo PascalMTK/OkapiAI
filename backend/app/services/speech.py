@@ -5,6 +5,9 @@ qui reconnaît le lingala, le swahili et le français. Le kikongo et le tshiluba
 encore de modèle public : l'utilisateur tape ce qu'il a dit, et ces enregistrements
 serviront à entraîner un modèle dédié.
 
+Tshiluba : MMS ne le couvre pas ; on utilise abdouaziiz/tshiluba (Whisper small affiné sur
+7 800 phrases tshiluba, 15 % de mots faux, Apache-2.0), copié dans backend/models/whisper-tshiluba.
+
 Repli : faster-whisper (OKAPI_ASR=whisper), qui ne couvre que fr / sw / ln.
 
 Le modèle n'est utilisé que s'il est déjà téléchargé (sinon la 1re requête bloquerait
@@ -194,12 +197,65 @@ class WhisperRecognizer:
             return " ".join(s.text.strip() for s in segments).strip() or None
 
 
+_LUA_MODEL = Path(os.getenv("OKAPI_ASR_LUA_MODEL") or Path(__file__).resolve().parents[2] / "models" / "whisper-tshiluba")
+
+
+class TshilubaRecognizer:
+    """Whisper affiné sur le tshiluba (entraîné avec la balise de langue « fr »)."""
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._model = self._proc = self._device = None
+        self._failed = False
+
+    def available(self) -> bool:
+        if self._failed:
+            return False
+        try:
+            import transformers  # noqa: F401
+        except ImportError:
+            return False
+        return (_LUA_MODEL / "model.safetensors").is_file()
+
+    def _load(self):
+        if self._model is not None or self._failed:
+            return
+        try:
+            import torch
+            from transformers import WhisperForConditionalGeneration, WhisperProcessor
+            self._device = ASR_DEVICE if ASR_DEVICE in ("cpu", "cuda") else ("cuda" if torch.cuda.is_available() else "cpu")
+            dtype = torch.float16 if self._device == "cuda" else torch.float32
+            self._proc = WhisperProcessor.from_pretrained(_LUA_MODEL)
+            self._model = WhisperForConditionalGeneration.from_pretrained(_LUA_MODEL, torch_dtype=dtype).to(self._device).eval()
+            log.info("Reconnaissance tshiluba chargée sur %s", self._device)
+        except Exception as exc:
+            log.warning("Reconnaissance tshiluba indisponible : %s", exc)
+            self._failed = True
+
+    def transcribe_array(self, audio) -> Optional[str]:
+        import torch
+        with self._lock:
+            self._load()
+            if self._model is None:
+                return None
+            feats = self._proc(audio[: 30 * SAMPLE_RATE], sampling_rate=SAMPLE_RATE, return_tensors="pt").input_features
+            with torch.inference_mode():
+                ids = self._model.generate(feats.to(self._device, self._model.dtype), language="fr",
+                                           task="transcribe", max_new_tokens=200)
+            return self._proc.batch_decode(ids, skip_special_tokens=True)[0].strip() or None
+
+    def transcribe(self, path: Path, lang: str) -> Optional[str]:
+        return self.transcribe_array(load_audio(path))
+
+
 class SpeechRecognizer:
     def __init__(self):
         self.mms = MMSRecognizer()
         self.whisper = WhisperRecognizer()
+        self.lua = TshilubaRecognizer()
 
     def _engine(self, lang: str):
+        if lang == "lua":
+            return self.lua if self.lua.available() else None
         if ASR_ENGINE in ("mms", "auto") and lang in MMS_LANGS and self.mms.available():
             return self.mms
         if ASR_ENGINE in ("whisper", "mms", "auto") and lang in WHISPER_LANGS and self.whisper.available():
@@ -222,7 +278,10 @@ class SpeechRecognizer:
             return None
 
     def warmup(self) -> None:
-        """Charge le modèle MMS à l'avance (appelé au démarrage, en arrière-plan)."""
+        """Charge les modèles à l'avance (appelé au démarrage, en arrière-plan)."""
+        if ASR_ENGINE != "off" and self.lua.available():
+            with self.lua._lock:
+                self.lua._load()
         if ASR_ENGINE != "off" and self.mms.available():
             with self.mms._lock:
                 self.mms._load()

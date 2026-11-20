@@ -20,7 +20,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from train_voice import base_files, clean_text, out_dir  # noqa: E402
+from train_voice import base_files, clean_text, lang_of, out_dir  # noqa: E402
 
 MAX_CHARS = 600
 
@@ -42,6 +42,8 @@ class Voice:
             ok = run / "approved_model.pth"
             if ok.exists() and (run / "config.json").exists():
                 return ok, run / "config.json"
+        if lang_of(self.speaker) != "ln":
+            return None, None   # pas de voix lingala de secours : un autre accent que celui de la langue
         try:
             ck, cfg = base_files()
             return Path(ck), Path(cfg)

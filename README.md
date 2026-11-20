@@ -94,13 +94,18 @@ La voix live utilise les modèles **Meta MMS** : on parle, OkapiAI transcrit, r�
 |---|---|---|
 | Lingala | ✅ `facebook/mms-1b-all` (adaptateur `lin`) | ✅ `khof312/mms-tts-lin` |
 | Swahili | ✅ `facebook/mms-1b-all` (adaptateur `swh`) | ✅ `facebook/mms-tts-swh` |
-| Kikongo, tshiluba | ⏳ pas encore de modèle public : on tape ce qu'on a dit | ⏳ pas encore |
+| Tshiluba | ✅ `abdouaziiz/tshiluba` (Whisper small affiné, ~15 % de mots faux, Apache-2.0) → `backend/models/whisper-tshiluba/` | ⚠️ provisoire : la voix lingala lit le tshiluba |
+| Kikongo | ⏳ pas encore de modèle public : on tape ce qu'on a dit | ⏳ pas encore |
 
 Téléchargement unique des modèles (~4,3 Go, GPU conseillé mais pas obligatoire) :
 
 ```bash
 python -c "from huggingface_hub import snapshot_download as d; d('khof312/mms-tts-lin'); d('facebook/mms-tts-swh'); d('facebook/mms-1b-all', allow_patterns=['*.json','model.safetensors','adapter.lin.safetensors','adapter.swh.safetensors','adapter.fra.safetensors'])"
+# tshiluba (~1 Go)
+python -c "from huggingface_hub import snapshot_download as d; d('abdouaziiz/tshiluba', local_dir='backend/models/whisper-tshiluba', allow_patterns=['*.json','*.txt','model.safetensors'])"
 ```
+
+Tshiluba : en « Détection automatique », seuls le lingala et le swahili sont reconnus ; choisissez « Tshiluba » dans le menu Langue. Les phrases tshiluba (`dataset/sources/tshiluba/phrases.jsonl`, 23 791 phrases, corpus [DanMM96/Tshiluba-dataset](https://huggingface.co/datasets/DanMM96/Tshiluba-dataset), CC BY 4.0, surtout biblique) servent d'exemples à l'IA et de vocabulaire à l'écoute tolérante ; elles se régénèrent avec `python tools/import_tshiluba.py`.
 
 Les modèles sont chargés au démarrage du serveur (en arrière-plan). Variables utiles : `OKAPI_ASR=off`, `OKAPI_TTS=off`, `OKAPI_VOICE_WARMUP=0`. Les voix MMS sont sous licence **CC BY-NC 4.0** (usage non commercial).
 
@@ -272,7 +277,8 @@ Les tests couvrent le circuit complet : seuil des 10 contributeurs, anti-spam, v
 - [x] Collecte vocale et apprentissage
 - [x] Conversation en langue nationale
 - [ ] Synthèse vocale entraînée sur les voix validées, pour que le bot parle lingala ou tshiluba
-- [ ] Reconnaissance vocale dédiée au kikongo et au tshiluba
+- [x] Reconnaissance vocale du tshiluba
+- [ ] Reconnaissance vocale du kikongo, voix tshiluba entraînée
 - [ ] Conversation vocale en streaming (WebSocket)
 - [ ] Limitation de débit et nettoyage automatique des audios non utilisés
 - [ ] Application mobile
