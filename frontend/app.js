@@ -281,9 +281,12 @@ function stopSpeaking() {
 }
 // Une longue réponse est dite phrase par phrase : la 1re phrase se synthétise vite et commence
 // à jouer pendant que la suivante se prépare (au lieu d'attendre toute la réponse).
-function ttsChunks(text, url) {
-  if (!url?.startsWith("/api/tts?") || !text || text.length < 90) return url ? [url] : [];
+function ttsChunks(shown, url) {
+  if (!url?.startsWith("/api/tts?")) return url ? [url] : [];
   const params = new URLSearchParams(url.slice("/api/tts?".length));   // lang, voice… (le texte change)
+  // le texte de l'URL garde les balises <fr>…</fr> (mots français dits par la même voix)
+  const text = params.get("text") || shown || "";
+  if (text.length < 90) return [url];
   const parts = text.match(/[^.!?…]+[.!?…]+["»”)]*\s*|[^.!?…]+$/g) || [text];
   const chunks = [];
   for (const p of parts.map((s) => s.trim()).filter(Boolean)) {

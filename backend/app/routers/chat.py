@@ -16,7 +16,7 @@ from ..services import recordings
 from ..services.corpus import corpus, corpus_lua_voice
 from ..services.hearing import for_lang as hearing_for
 from ..services.speech import recognizer
-from ..services.tts import MAX_CHARS, SAME_VOICE_FR, display_text, split_voices, synthesizer
+from ..services.tts import MAX_CHARS, display_text, synthesizer
 
 router = APIRouter(prefix="/api", tags=["chat"])
 AUTO = "auto"  # voix live : détecter la langue nationale parlée
@@ -176,15 +176,11 @@ def _check_conv_lang(lang: str) -> None:
 def _with_hint(res: dict) -> dict:
     raw = res.get("reply")
     res["reply"], res["reply_fr"] = display_text(raw), display_text(res.get("reply_fr"))
-    res["tts_url"] = None if res.get("audio_url") else tts_url(res.get("reply"), res["lang"])
-    # morceaux à dire chacun avec la voix de sa langue (mots français -> voix française, puis relais)
-    segs = [] if res.get("audio_url") else split_voices(raw, res["lang"])
-    # chaque morceau avec la voix de SA langue : les mots français par la voix française
-    # (OKAPI_TTS_FR_SAME_VOICE=1 : par la voix de la conversation, timbre converti)
-    res["speech"] = [{**s, "tts_url": tts_url(s["text"], s["lang"],
-                                              voice=res["lang"] if s["lang"] == "fr" and SAME_VOICE_FR else None)}
-                     for s in segs] \
-        if len(segs) > 1 or (segs and segs[0]["lang"] != res["lang"]) else None
+    # Une seule voix, celle de la langue de la conversation : elle dit toute la réponse d'un seul
+    # trait, y compris les mots français (balisés <fr> par l'IA ou reconnus, puis réécrits comme ils
+    # se prononcent, voir services/frenchspeak.py). Le texte envoyé garde les balises.
+    res["tts_url"] = None if res.get("audio_url") else tts_url(raw, res["lang"])
+    res["speech"] = None
     if res["reply"] is None:
         res["hint"] = ("Je ne sais pas encore répondre à ce message dans cette langue. "
                        "Apprenez-moi : écrivez la réponse qu'une personne donnerait !")

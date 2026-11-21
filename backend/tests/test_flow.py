@@ -433,6 +433,15 @@ def test_phrase_translation_and_voices():
     assert display_text(text) == "« ndako » elingi koloba maison."
     assert [s["lang"] for s in split_voices(text, "ln")] == ["ln", "fr"]
     assert split_voices("Mbote !", "ln") == [{"lang": "ln", "text": "Mbote !"}]
+    # une seule voix : les mots français sont réécrits comme ils se prononcent, le reste ne bouge pas
+    from app.services.frenchspeak import for_national_voice, french_for_voice
+    assert french_for_voice("bonjour") == "bojur" and french_for_voice("maison") == "mezo"
+    assert for_national_voice("ezali <fr>maison</fr>.") == "ezali mezo."
+    known_fr = {"voiture"}.__contains__
+    assert for_national_voice("Tokokende na voiture", known_fr) == "Tokokende na vwatir"
+    assert for_national_voice("Kinshasa ezali kitoko", lambda w: True) == "Kinshasa " + \
+        " ".join(french_for_voice(w) for w in ("ezali", "kitoko"))   # nom propre laissé tel quel
+    assert for_national_voice("Mbote na yo", None) == "Mbote na yo"
 
 
 def test_gpu_released_during_training():

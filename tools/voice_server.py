@@ -23,6 +23,8 @@ from urllib.parse import parse_qs, urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from train_voice import base_files, clean_text, lang_of, out_dir, training_active  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
+from app.services.frenchspeak import french_for_voice  # noqa: E402
 
 
 def device() -> str:
@@ -69,37 +71,6 @@ def say_number(n: int, lang: str) -> str:
     if n:
         parts.append(w["units"][n])
     return f" {w['and']} ".join(parts)
-
-
-# Mots français dits avec LA MÊME voix que la langue nationale : la voix ne connaît que les sons bantous
-# (a e i o u, sans nasales), on réécrit donc le français comme il se prononce, à la manière d'un
-# locuteur de Kinshasa (« bonjour » -> « bojur », « maison » -> « mezo », « bureau » -> « biro »).
-_FR_RULES = [
-    # consonnes qui dépendent de la voyelle suivante : avant de toucher aux voyelles
-    (r"aujourd'hui", "ojUrdwi"), (r"tion", "Sion"), (r"ch", "sh"), (r"gn", "ny"), (r"qu", "k"), (r"ph", "f"), (r"th", "t"), (r"ç", "s"),
-    (r"c(?=[eiyéèêë])", "s"), (r"gu(?=[eiyéèêë])", "g"), (r"g(?=[eiyéèêë])", "j"), (r"c", "k"),
-    (r"(?<=[aeiouyéèêàâôî])s(?=[aeiouyéèêàâôî])", "z"),
-    # lettres finales muettes (« petites » -> « petit » -> « peti »), « -er / -ez / -et » -> « e »
-    (r"(?<=\w\w)(?:er|ez|et)\b", "é"), (r"(?<=\w\w)(?:es|e|s|x)\b", ""), (r"(?<=\w\w)(?:t|d|p|s|z)\b", ""),
-    # voyelles (U = « ou », mis de côté pour que le « u » français devienne « i »)
-    (r"eau", "o"), (r"au", "o"), (r"o[uùû]", "U"), (r"oi", "wa"), (r"oy", "way"), (r"[uU]i", "wi"),
-    (r"(?<![nN])y", "i"),
-    (r"(?<=[aeiouU])ill", "y"), (r"ill", "iy"),
-    (r"(?:ai|ei)[nm](?![aeiouynm])", "e"), (r"[iy][nm](?![aeiouynm])", "e"), (r"un\b", "e"),
-    (r"[ae][nm](?![aeiouynm])", "a"), (r"o[nm](?![aeiouynm])", "o"),
-    (r"(?:ai|ei|è|ê|ë|é)", "e"), (r"[eœ]u", "e"), (r"œ", "e"),
-    (r"[uùû]", "i"), (r"U", "u"),  # « bureau » -> « biro », « bonjour » -> « bojur »
-    (r"x", "ks"), (r"\bh", ""), (r"(?<![s])h", ""), (r"'", ""), (r"S", "s"),
-    (r"([bdfgklmnprstvz])\1", r"\1"), (r"[àâ]", "a"), (r"[îï]", "i"), (r"ô", "o"),
-]
-
-
-def french_for_voice(text: str) -> str:
-    t = text.lower().replace("’", "'")
-    t = re.sub(r"\b([ldjmtsnc]|qu)'", r"\1e ", t)     # l'école -> le ecole
-    for pat, rep in _FR_RULES:
-        t = re.sub(pat, rep, t)
-    return t
 
 
 def spell_numbers(text: str, lang: str) -> str:

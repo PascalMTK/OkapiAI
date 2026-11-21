@@ -36,12 +36,18 @@ VOICES = {
 }
 if os.getenv("OKAPI_TTS_LUA", "") != "off":
     VOICES["lua"] = os.getenv("OKAPI_TTS_LUA") or VOICES["ln"]   # voix provisoire : la voix lingala
+# Kikongo : pas encore de voix ; la voix lingala le lit (même alphabet, langues bantoues voisines)
+# plutôt que de laisser OkapiAI muet. OKAPI_TTS_KG=off la désactive.
+if os.getenv("OKAPI_TTS_KG", "") != "off":
+    VOICES["kg"] = os.getenv("OKAPI_TTS_KG") or VOICES["ln"]
 # Voix externes (ex. voix affinée sur notre dataset, tools/voice_server.py) : OKAPI_TTS_<LANG>_URL.
 # Utilisées en priorité ; si elles ne répondent pas, on revient à la voix MMS.
 REMOTE = {lang: url.rstrip("/") for lang in ("ln", "sw", "lua")
           if (url := os.getenv(f"OKAPI_TTS_{lang.upper()}_URL"))}
 if "lua" in VOICES and "lua" not in REMOTE and "ln" in REMOTE:
     REMOTE["lua"] = REMOTE["ln"]
+if "kg" in VOICES and "ln" in REMOTE:
+    REMOTE["kg"] = REMOTE["ln"]
 # Mots français cités dans une réponse : dits par la voix française MMS (défaut). Les voix des langues
 # nationales ne disent que leur langue. OKAPI_TTS_FR_SAME_VOICE=1 : voix de la conversation à la place.
 SAME_VOICE_FR = os.getenv("OKAPI_TTS_FR_SAME_VOICE", "0") == "1"
@@ -49,7 +55,7 @@ AUTO_DOWNLOAD = os.getenv("OKAPI_TTS_AUTO_DOWNLOAD") == "1"
 ENABLED = os.getenv("OKAPI_TTS", "on") != "off"
 TTS_DIR = AUDIO_DIR / "tts"
 MAX_CHARS = 600
-CACHE_VERSION = "v2"  # à changer quand la préparation du texte change (invalide l'ancien cache)
+CACHE_VERSION = "v3"  # à changer quand la préparation du texte change (invalide l'ancien cache)
 PAUSE_S = 0.35        # silence entre deux phrases
 
 
@@ -111,6 +117,19 @@ def split_voices(text: Optional[str], lang: str) -> list[dict]:
     return [s for s in out if re.search(r"\w", s["text"])]
 
 
+def national_text(text: str, lang: str) -> str:
+    """Phrase prête pour la voix de `lang` : mots français (balisés <fr> ou reconnus) réécrits
+    comme ils se prononcent, pour que la même voix dise toute la phrase."""
+    from .frenchspeak import for_national_voice
+    try:
+        from .hearing import for_lang
+        h = for_lang("ln" if lang == "kg" else lang)
+        is_french = h.is_french if h is not None else None
+    except Exception:
+        is_french = None
+    return " ".join(for_national_voice(text, is_french).split())
+
+
 def sentences(text: str) -> list[str]:
     """Découpe en phrases : la voix ignore la ponctuation, on ajoute donc les pauses nous-mêmes."""
     parts = re.split(r"(?<=[.!?;:…])\s+|\n+", text)
@@ -169,7 +188,11 @@ class Synthesizer:
 
     def _voice(self, lang: str):
         if lang not in self._voices:
-            import torch
+            # même voix pour plusieurs langues (lingala pour tshiluba / kikongo) : un seul modèle en mémoire
+            shared = next((l for l in self._voices if VOICES.get(l) == VOICES[lang]), None)
+            if shared is not None:
+                self._voices[lang] = self._voices[shared]
+                return self._voices[lang]
             from transformers import AutoTokenizer, VitsModel
             device = preferred_device(os.getenv("OKAPI_TTS_DEVICE", "auto"))   # cpu pendant un entraînement
             tok = AutoTokenizer.from_pretrained(VOICES[lang])
@@ -185,7 +208,7 @@ class Synthesizer:
         with self._lock:
             for lang, (tok, model) in list(self._voices.items()):
                 if model.device.type != device:
-                    self._voices[lang] = (tok, model.to(device))
+                    model.to(device)   # en place : les langues qui partagent ce modèle suivent
 
     def warmup(self) -> None:
         """Charge les voix disponibles à l'avance (appelé au démarrage, en arrière-plan)."""
@@ -228,6 +251,9 @@ class Synthesizer:
         `voice` (texte français seulement) : la voix de la langue nationale de la conversation dit
         aussi les mots français, pour garder la même voix ; sinon voix française MMS."""
         text = " ".join((text or "").split())[:MAX_CHARS]
+        if lang != "fr":
+            # une seule voix : les mots français de la phrase sont dits par la voix de la langue
+            text = national_text(text, lang)
         if not text:
             return None
         if lang == "fr" and voice and SAME_VOICE_FR and self._remote_ok(voice):

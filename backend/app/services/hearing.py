@@ -17,7 +17,7 @@ from difflib import SequenceMatcher, get_close_matches
 from typing import Optional
 
 from ..config import DATASET_DIR
-from .lexicon import key, lexicon
+from .lexicon import COMMON_FR, key, lexicon
 
 log = logging.getLogger("okapiai.hearing")
 
@@ -59,6 +59,7 @@ class Hearing:
         self._by_soft: dict[str, str] = {}          # forme d'oreille -> mot le plus fréquent
         self._phrases: list[tuple[str, str]] = []   # (forme d'oreille, phrase courante)
         self._french: set[str] = set()              # mots français : on les laisse tels quels
+        self._voice_french: Optional[set[str]] = None   # mots français à réécrire pour la voix
 
     def _load(self) -> None:
         with self._lock:
@@ -96,6 +97,22 @@ class Hearing:
 
     def _soft(self, text: str) -> str:
         return soft(text, self.lang)
+
+    def is_french(self, word: str) -> bool:
+        """Pour la voix : mot français glissé dans la langue (« université », « voiture »). Les emprunts
+        présents dans le corpus comptent aussi (la voix ne sait pas les lire tels quels), mais pas les
+        vrais mots de la langue (dictionnaire lingala, échanges de base)."""
+        self._load()
+        k = key(word)
+        if self._voice_french is None:
+            french = {w for f in list(lexicon._fr) + list(COMMON_FR) for w in key(f).split() if len(w) > 2}
+            national = {w for k2 in lexicon._ln for w in k2.split()} if self.lang == "ln" else set(self._freq)
+            from .basics import BASICS
+            for triggers, reply, _ in BASICS.get(self.lang, []):
+                national.update(w for t in triggers for w in key(t).split())
+                national.update(key(reply).split())
+            self._voice_french = french - national
+        return k in self._voice_french
 
     def _known_verb(self, w: str) -> bool:
         """Forme conjuguée d'un verbe connu (ko + racine dans le vocabulaire ou le dictionnaire).
