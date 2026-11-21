@@ -163,7 +163,8 @@ def base_files():
 
 
 def train(speaker: str, epochs: int, batch: int, resume: bool = False, lr: float = 5e-5,
-          freeze_text: Optional[bool] = None, fp16: bool = False, start_from: Optional[str] = None) -> None:
+          freeze_text: Optional[bool] = None, fp16: bool = False, start_from: Optional[str] = None,
+          save_step: int = 500) -> None:
     lang = lang_of(speaker)
     if freeze_text is None:   # nouvelle langue : le lecteur de texte doit apprendre ses sons
         freeze_text = lang == "ln"
@@ -204,8 +205,8 @@ def train(speaker: str, epochs: int, batch: int, resume: bool = False, lr: float
     # données suffisaient à rendre la voix à moitié incompréhensible (52 % de lettres fausses).
     config.model_args.freeze_encoder = freeze_text
     # Points de sauvegarde réguliers : `check` choisit celui qui se comprend le mieux
-    config.print_step, config.save_step, config.save_n_checkpoints = 25, 500, 3
-    config.save_best_after = 500
+    config.print_step, config.save_step, config.save_n_checkpoints = 25, save_step, 3
+    config.save_best_after = save_step
     config.num_loader_workers = config.num_eval_loader_workers = 0   # Windows
     config.max_audio_len = 12 * RATE                # évite de saturer les 4 Go de VRAM
     # en symboles (avec les « blancs » insérés entre les lettres) : les versets bibliques dépassent 400
@@ -375,9 +376,10 @@ if __name__ == "__main__":
     ap.add_argument("--max-clips", type=int, default=100000, help="prepare : nombre maximum de phrases")
     ap.add_argument("--fp16", action="store_true", help="calcul rapide en demi-précision")
     ap.add_argument("--from", dest="start_from", help="train : repartir de cette sauvegarde (.pth)")
+    ap.add_argument("--save-step", type=int, default=500, help="train : une sauvegarde tous les N pas")
     a = ap.parse_args()
     {"prepare": lambda: prepare(a.speaker, a.max_clips),
      "train": lambda: train(a.speaker, a.epochs, a.batch, a.resume, a.lr, False if a.no_freeze else None, a.fp16,
-                               a.start_from),
+                               a.start_from, a.save_step),
      "check": lambda: check(a.speaker),
      "sample": lambda: sample(a.speaker)}[a.step]()

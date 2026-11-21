@@ -272,11 +272,39 @@ const inputCls = "w-full bg-slate-50 dark:bg-obsidian-950 border border-slate-30
 
 // Fait parler OkapiAI. Priorité : enregistrement validé > voix OkapiAI (serveur, langues
 // nationales) > voix du navigateur (français / swahili). Résout quand la lecture est finie.
-let currentAudio = null;
+let currentAudio = null, speakToken = 0;
 function stopSpeaking() {
+  speakToken++;                       // arrête aussi une lecture phrase par phrase en cours
   currentAudio?.pause();
   currentAudio = null;
   if ("speechSynthesis" in window) speechSynthesis.cancel();
+}
+// Une longue réponse est dite phrase par phrase : la 1re phrase se synthétise vite et commence
+// à jouer pendant que la suivante se prépare (au lieu d'attendre toute la réponse).
+function ttsChunks(text, url) {
+  const m = /^\/api\/tts\?lang=([^&]+)&text=/.exec(url || "");
+  if (!m || !text || text.length < 90) return url ? [url] : [];
+  const parts = text.match(/[^.!?…]+[.!?…]+["»”)]*\s*|[^.!?…]+$/g) || [text];
+  const chunks = [];
+  for (const p of parts.map((s) => s.trim()).filter(Boolean)) {
+    // phrases très courtes (« Ee ! ») regroupées avec la suivante : moins de coupures
+    if (chunks.length && chunks[chunks.length - 1].length < 25) chunks[chunks.length - 1] += " " + p;
+    else chunks.push(p);
+  }
+  return chunks.map((c) => `/api/tts?lang=${m[1]}&text=${encodeURIComponent(c.slice(0, 600))}`);
+}
+// Joue des URL à la suite ; la suivante est déjà téléchargée pendant la lecture de la précédente.
+// `onAudio(a)` permet de brancher chaque lecteur (orbe animé) ; `isStopped()` arrête la suite.
+async function playChunks(urls, onAudio, isStopped) {
+  let next = urls.length ? new Audio(urls[0]) : null;
+  for (let i = 0; i < urls.length && next; i++) {
+    const a = next;
+    next = i + 1 < urls.length ? new Audio(urls[i + 1]) : null;
+    if (next) next.preload = "auto";
+    if (isStopped()) return;
+    onAudio(a);
+    await new Promise((resolve) => { a.onended = a.onerror = resolve; a.play().catch(resolve); });
+  }
 }
 function playUrl(url) {
   return new Promise((resolve) => {
@@ -292,7 +320,11 @@ const ttsFor = (text, lang) => (text && state.voiceCaps?.tts?.includes(lang)
   ? `/api/tts?lang=${encodeURIComponent(lang)}&text=${encodeURIComponent(text.slice(0, 600))}` : null);
 
 function speak(text, lang, ttsUrl) {
-  if (ttsUrl) return playUrl(ttsUrl);
+  if (ttsUrl) {
+    stopSpeaking();
+    const token = speakToken;
+    return playChunks(ttsChunks(text, ttsUrl), (a) => (currentAudio = a), () => token !== speakToken);
+  }
   return new Promise((resolve) => {
     if (!text || !("speechSynthesis" in window) || !["fr", "sw"].includes(lang)) return resolve();
     stopSpeaking();
@@ -704,12 +736,12 @@ function liveSpeak(text, lang, url) {
     };
     live.stopPlayback = finish;
     if (url) {
-      const a = new Audio(url);
-      live.player = a;
-      try { live.ctx.createMediaElementSource(a).connect(live.playAnalyser); }
-      catch { $("#live-orb").classList.add("no-level"); }
-      a.onended = a.onerror = () => finish();
-      a.play().catch(() => finish());
+      // phrase par phrase : OkapiAI commence à parler dès que la 1re phrase est prête
+      playChunks(ttsChunks(text, url), (a) => {
+        live.player = a;
+        try { live.ctx.createMediaElementSource(a).connect(live.playAnalyser); }
+        catch { $("#live-orb").classList.add("no-level"); }
+      }, () => done).then(() => finish());
     } else if ("speechSynthesis" in window && ["fr", "sw"].includes(lang)) {
       $("#live-orb").classList.add("no-level");
       const u = new SpeechSynthesisUtterance(text);

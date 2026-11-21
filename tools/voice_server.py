@@ -12,6 +12,7 @@ N'écoute que sur 127.0.0.1.
 import argparse
 import io
 import json
+import re
 import sys
 import threading
 import wave
@@ -23,6 +24,46 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from train_voice import base_files, clean_text, lang_of, out_dir  # noqa: E402
 
 MAX_CHARS = 600
+
+# Les voix n'ont appris que des lettres : un chiffre (« 2 bato », « 2026 ») faisait échouer la phrase
+# entière, et OkapiAI se rabattait sur la voix de secours, bien plus lente. On les dit en toutes lettres.
+NUMBERS = {
+    "ln": {"units": ["", "moko", "mibale", "misato", "minei", "mitano", "motoba", "nsambo", "mwambe", "libwa"],
+           "ten": "zomi", "tens": "ntuku", "hundred": "nkama", "thousand": "nkoto", "and": "na", "zero": "libungutulu"},
+    "lua": {"units": ["", "umue", "ibidi", "isatu", "inayi", "itanu", "isambombo", "muanda mutekete",
+                      "muanda mukulu", "tshitema"],
+            "ten": "dikumi", "hundred": "lukama", "thousand": "tshinunu", "and": "ne", "zero": "zero",
+            # accords : makumi abidi (20), nkama ibidi (200), binunu bibidi (2000)
+            "tens_list": ["", "dikumi", "makumi abidi", "makumi asatu", "makumi anayi", "makumi atanu",
+                          "makumi asambombo", "makumi muanda mutekete", "makumi muanda mukulu", "makumi tshitema"],
+            "plural": {"lukama": "nkama", "tshinunu": "binunu"}},
+}
+
+
+def say_number(n: int, lang: str) -> str:
+    w = NUMBERS.get(lang, NUMBERS["ln"])
+    if n == 0:
+        return w["zero"]
+    parts = []
+    for size, name in ((1000, w["thousand"]), (100, w["hundred"])):
+        q, n = divmod(n, size)
+        if q:
+            plural = w.get("plural", {}).get(name, name)
+            parts.append(f"{plural} {say_number(q, lang)}" if q > 1 else name)
+    q, n = divmod(n, 10)
+    if q:
+        parts.append(w["tens_list"][q] if "tens_list" in w else
+                     w["ten"] if q == 1 else f"{w['tens']} {w['units'][q]}")
+    if n:
+        parts.append(w["units"][n])
+    return f" {w['and']} ".join(parts)
+
+
+def spell_numbers(text: str, lang: str) -> str:
+    def one(m):
+        digits = m.group(0).replace(" ", "")
+        return f" {say_number(int(digits), lang)} " if len(digits) <= 6 else " "
+    return re.sub(r"\d+", one, text)
 
 
 class Voice:
@@ -65,7 +106,8 @@ class Voice:
 
     def wav(self, text: str) -> bytes:
         import numpy as np
-        prepared = clean_text(text.replace("«", " ").replace("»", " ").replace("…", "."))
+        text = spell_numbers(text.replace("«", " ").replace("»", " ").replace("…", "."), lang_of(self.speaker))
+        prepared = clean_text(text)
         if not prepared:
             raise ValueError("texte vide après préparation")
         with self.lock:
