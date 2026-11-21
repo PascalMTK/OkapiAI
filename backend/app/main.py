@@ -72,6 +72,12 @@ def _migrate() -> None:
         log.info("Migration : un vote par personne (%d doublon(s) fusionné(s))", removed)
 
 
+def _prepare_live_phrases() -> None:
+    """Salutation et « répète » de la voix live, synthétisés d'avance dans chaque langue."""
+    from .routers.chat import GREETINGS, RETRY
+    synthesizer.prepare([(text, lang) for table in (GREETINGS, RETRY) for lang, (text, _) in table.items()])
+
+
 def _warm_language_data() -> None:
     try:
         from .services.corpus import corpus, corpus_lua
@@ -95,7 +101,8 @@ async def lifespan(_: FastAPI):
              "désactivée (ajoutez GEMINI_API_KEY, GROQ_API_KEY ou OPENROUTER_API_KEY dans backend/.env)")
     if os.getenv("OKAPI_VOICE_WARMUP", "1") == "1":
         # Charge la reconnaissance vocale et les voix sans bloquer le démarrage du serveur
-        threading.Thread(target=lambda: (recognizer.warmup(), synthesizer.warmup()), daemon=True).start()
+        threading.Thread(target=lambda: (recognizer.warmup(), synthesizer.warmup(), _prepare_live_phrases()),
+                         daemon=True).start()
         # Dictionnaire et corpus chargés d'avance : sinon le 1er message après un démarrage attend ~10 s
         threading.Thread(target=_warm_language_data, daemon=True).start()
         # Entraînement d'une voix en cours : les modèles laissent la carte graphique, puis y reviennent

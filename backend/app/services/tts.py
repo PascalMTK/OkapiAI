@@ -13,6 +13,7 @@ Comme pour la reconnaissance, une voix n'est utilisée que si elle est déjà t�
 (ou si OKAPI_TTS_AUTO_DOWNLOAD=1).
 """
 import hashlib
+import json
 import logging
 import os
 import re
@@ -55,8 +56,9 @@ AUTO_DOWNLOAD = os.getenv("OKAPI_TTS_AUTO_DOWNLOAD") == "1"
 ENABLED = os.getenv("OKAPI_TTS", "on") != "off"
 TTS_DIR = AUDIO_DIR / "tts"
 MAX_CHARS = 600
-CACHE_VERSION = "v3"  # à changer quand la préparation du texte change (invalide l'ancien cache)
+CACHE_VERSION = "v4"  # à changer quand la préparation du texte change (invalide l'ancien cache)
 PAUSE_S = 0.35        # silence entre deux phrases
+LEAD_S = 0.15         # silence avant le son (la 1re syllabe n'est plus avalée par le navigateur)
 
 
 def speakable(text: str) -> str:
@@ -142,6 +144,7 @@ class Synthesizer:
         self._voices: dict[str, tuple] = {}
         self._failed: set[str] = set()
         self._remote_state: dict[str, tuple[bool, float]] = {}
+        self._remote_version: dict[str, str] = {}   # version de la voix entraînée (cache)
 
     def _remote_ok(self, lang: str) -> bool:
         """La voix externe répond-elle ? (vérifié au plus une fois toutes les 30 s)"""
@@ -157,9 +160,11 @@ class Synthesizer:
         try:
             with urllib.request.urlopen(f"{url}/health", timeout=2) as r:
                 ok = r.status == 200
-        except Exception:
+                self._remote_version[lang] = json.loads(r.read() or b"{}").get("version") or ""
+        except Exception:   # 503 = la voix se réchauffe encore : voix de secours en attendant
             ok = False
-        self._remote_state[lang] = (ok, now)
+        # re-vérifiée vite tant qu'elle n'est pas prête (démarrage), puis toutes les 30 s
+        self._remote_state[lang] = (ok, now if ok else now - 25)
         return ok
 
     def engine(self, lang: str) -> Optional[str]:
@@ -211,15 +216,34 @@ class Synthesizer:
                     model.to(device)   # en place : les langues qui partagent ce modèle suivent
 
     def warmup(self) -> None:
-        """Charge les voix disponibles à l'avance (appelé au démarrage, en arrière-plan)."""
+        """Charge les voix disponibles à l'avance (appelé au démarrage, en arrière-plan), et fait un
+        premier calcul avec chacune : sur la carte graphique, le tout premier est très lent (~10 s)."""
+        import torch
         for lang in VOICES:
             if self._mms_supports(lang):
                 with self._lock:
                     try:
-                        self._voice(lang)
+                        tok, model = self._voice(lang)
+                        for s in ("mbote", "mbote na yo, ozali malamu mpenza lelo"):
+                            with torch.inference_mode():
+                                model(**tok(s, return_tensors="pt").to(model.device))
                     except Exception as exc:
                         log.warning("Voix %s indisponible : %s", lang, exc)
                         self._failed.add(lang)
+
+    def prepare(self, phrases: list[tuple[str, str]], wait_s: float = 120.0) -> None:
+        """Phrases dites à chaque Voix live (salutation, « répète ») préparées d'avance, avec la voix
+        entraînée dès qu'elle est prête : la 1re réponse d'OkapiAI part tout de suite."""
+        import time
+        end = time.monotonic() + wait_s
+        while time.monotonic() < end and any(l in REMOTE and not self._remote_ok(l) for _, l in phrases):
+            time.sleep(5)
+        for text, lang in phrases:
+            try:
+                self.synthesize(text, lang)
+            except Exception as exc:
+                log.warning("Préparation de « %s » (%s) : %s", text[:30], lang, exc)
+        log.info("Phrases de la voix live prêtes (%d)", len(phrases))
 
     def path_for(self, text: str, lang: str, engine: str = "mms") -> Path:
         digest = hashlib.sha1(f"{CACHE_VERSION}|{engine}|{lang}|{text}".encode("utf-8")).hexdigest()[:24]
@@ -229,9 +253,13 @@ class Synthesizer:
         """Voix externe de `lang` ; `text_lang="fr"` : elle dit un texte français (même voix)."""
         import urllib.parse
         import urllib.request
-        # pas de cache : la voix affinée change pendant l'entraînement
+        # cache lié à la version de la voix : une nouvelle voix validée ne ressert pas les anciens sons
         tag = f"{lang}-{text_lang}" if text_lang else lang
-        path = TTS_DIR / f"{tag}-remote-{hashlib.sha1(text.encode('utf-8')).hexdigest()[:24]}.wav"
+        version = self._remote_version.get(lang, "")
+        digest = hashlib.sha1(f"{CACHE_VERSION}|{version}|{text}".encode("utf-8")).hexdigest()[:24]
+        path = TTS_DIR / f"{tag}-remote-{digest}.wav"
+        if version and path.exists():
+            return path
         try:
             url = f"{REMOTE[lang]}/tts?text={urllib.parse.quote(text)}"
             if text_lang:
@@ -243,7 +271,9 @@ class Synthesizer:
             self._remote_state[lang] = (False, __import__("time").monotonic())
             return None
         TTS_DIR.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(data)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_bytes(data)
+        tmp.replace(path)
         return path
 
     def synthesize(self, text: str, lang: str, voice: Optional[str] = None) -> Optional[Path]:
@@ -292,7 +322,9 @@ class Synthesizer:
                     pieces.append(wav)
                 if not pieces:
                     return None
-                wav = np.concatenate(pieces)
+                # court silence au début : sans lui, le navigateur avale la première syllabe
+                wav = np.concatenate([np.zeros(int(rate * LEAD_S), dtype=np.float32), *pieces,
+                                      np.zeros(int(rate * 0.08), dtype=np.float32)])
                 pcm = (wav.clip(-1, 1) * 32767).astype("<i2").tobytes()
                 TTS_DIR.mkdir(parents=True, exist_ok=True)
                 tmp = path.with_suffix(".tmp")

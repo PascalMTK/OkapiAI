@@ -34,6 +34,8 @@ def device() -> str:
 
 MAX_CHARS = 600
 NOISE, NOISE_DP = 0.4, 0.3   # modifiables : --noise / --noise-dp
+LEAD_S, TAIL_S = 0.15, 0.08  # silence ajouté avant / après chaque son
+CACHE_MAX = 400              # phrases gardées en mémoire
 FR_VOICE = "facebook/mms-tts-fra"                                       # prononce le français
 VC_MODEL = "voice_conversion_models/multilingual/multi-dataset/openvoice_v2"  # lui donne notre timbre
 USE_VC = False               # --vc : mots français avec le timbre de cette voix (désactivé : le français
@@ -89,6 +91,8 @@ class Voice:
         self.mtime = None
         self.vc = None            # conversion de voix (mots français), chargée à la 1re demande
         self.fr_failed = False
+        self.cache: dict = {}     # phrases déjà synthétisées (vidé de fait quand la voix change)
+        self.ready = False        # vrai une fois la voix chargée ET réchauffée
 
     def _best(self):
         """Voix affinée validée (approved_model.pth, écrit par `train_voice.py check` quand la voix
@@ -206,15 +210,27 @@ class Voice:
             raise ValueError("texte vide après préparation")
         with self.lock:
             self._ensure()
+            cache_key = (prepared, str(self.model_path), self.mtime)
+            if cache_key in self.cache:          # phrase déjà dite (salutation, « répète »…) : immédiat
+                return self.cache[cache_key]
             audio = np.asarray(self.synth.tts(prepared, split_sentences=True), dtype=np.float32)
             rate = self.synth.output_sample_rate
+        # Court silence au début : le navigateur avale souvent les premières millisecondes d'un son,
+        # et avec elles la première syllabe (« mbote » entendu « bote »)
+        audio = np.concatenate([np.zeros(int(rate * LEAD_S), np.float32), audio,
+                                np.zeros(int(rate * TAIL_S), np.float32)])
         buf = io.BytesIO()
         with wave.open(buf, "wb") as w:
             w.setnchannels(1)
             w.setsampwidth(2)
             w.setframerate(rate)
             w.writeframes((np.clip(audio, -1, 1) * 32767).astype("<i2").tobytes())
-        return buf.getvalue()
+        data = buf.getvalue()
+        with self.lock:
+            if len(self.cache) >= CACHE_MAX:
+                self.cache.pop(next(iter(self.cache)))   # le plus ancien
+            self.cache[cache_key] = data
+        return data
 
 
 def make_handler(voice: Voice):
@@ -232,10 +248,14 @@ def make_handler(voice: Voice):
         def do_GET(self):
             url = urlparse(self.path)
             if url.path == "/health":
+                # 503 tant que la voix se réchauffe : le site utilise alors sa voix de secours au lieu
+                # d'attendre ~20 s le premier son
                 best, _ = voice._best()
-                return self._send(200 if best else 503, json.dumps(
-                    {"ok": best is not None, "speaker": voice.speaker, "model": str(best) if best else None}).encode(),
-                    "application/json")
+                ok = best is not None and voice.ready
+                version = f"{best}:{best.stat().st_mtime:.0f}" if best else None
+                return self._send(200 if ok else 503, json.dumps(
+                    {"ok": ok, "ready": voice.ready, "speaker": voice.speaker,
+                     "model": str(best) if best else None, "version": version}).encode(), "application/json")
             if url.path == "/tts":
                 text = (parse_qs(url.query).get("text") or [""])[0][:MAX_CHARS]
                 try:
@@ -262,9 +282,20 @@ if __name__ == "__main__":
     print(f"Serveur de voix ({a.speaker}) sur http://127.0.0.1:{a.port}", flush=True)
     # Charge la voix tout de suite : sinon la 1re phrase d'OkapiAI attend ~30 s
     def warm():
-        voice.wav("mbote")
+        # Le 1er calcul sur la carte graphique est très lent (préparation des noyaux pour chaque
+        # longueur de phrase) : on en fait quelques-uns, courts et longs, avant d'accueillir le site.
+        lang = lang_of(a.speaker)
+        samples = {"lua": ["moyo", "Moyo webe ! Udi muimpe ?", "Tuasakidila bikole, ndi muimpe. Udi musue tuyukile bua tshinyi lelu ?"]}
+        for s in samples.get(lang, ["mbote", "Mbote ! Ozali malamu ?",
+                                    "Nazali malamu mpenza, matondo. Olingi tosolola na nini lelo na mokolo ya lelo ?"]):
+            try:
+                voice.wav(s)
+            except Exception as exc:
+                print(f"Réchauffage : {exc}", flush=True)
         if USE_VC:
             voice.wav("bonjour", "fr")   # charge aussi la conversion (~2 s), sinon le 1er mot français attend
+        voice.ready = True
+        print(f"Voix {a.speaker} prête", flush=True)
     threading.Thread(target=warm, daemon=True).start()
 
     def follow_gpu():   # un entraînement démarre ou finit : la voix change de processeur
