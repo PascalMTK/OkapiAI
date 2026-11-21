@@ -91,8 +91,12 @@ def prepare_parquet(speaker: str, max_clips: int) -> None:
     files = sorted(TSHILUBA_VOIX.glob("*.parquet"))
     if not files:
         sys.exit(f"Aucun fichier parquet dans {TSHILUBA_VOIX}")
+    def rows_of(f):  # par petits paquets : un fichier entier ne tient pas toujours en mémoire
+        for batch in pq.ParquetFile(f).iter_batches(batch_size=16):
+            yield from batch.to_pylist()
+
     for f in files:
-        for i, row in enumerate(pq.read_table(f).to_pylist()):
+        for i, row in enumerate(rows_of(f)):
             if len(lines) >= max_clips:
                 break
             text = clean_text(row.get("transcription") or "")
@@ -159,7 +163,7 @@ def base_files():
 
 
 def train(speaker: str, epochs: int, batch: int, resume: bool = False, lr: float = 5e-5,
-          freeze_text: Optional[bool] = None, fp16: bool = False) -> None:
+          freeze_text: Optional[bool] = None, fp16: bool = False, start_from: Optional[str] = None) -> None:
     lang = lang_of(speaker)
     if freeze_text is None:   # nouvelle langue : le lecteur de texte doit apprendre ses sons
         freeze_text = lang == "ln"
@@ -170,10 +174,14 @@ def train(speaker: str, epochs: int, batch: int, resume: bool = False, lr: float
     from TTS.tts.models.vits import Vits
 
     ckpt, cfg_path = base_files()
-    if resume:  # repart du meilleur modèle déjà affiné sur ce locuteur, au lieu de la voix Open Bible
+    if start_from:  # une sauvegarde précise
+        ckpt = str(start_from)
+        print(f"Reprise depuis {ckpt}", flush=True)
+    elif resume:  # repart du meilleur modèle déjà affiné sur ce locuteur, au lieu de la voix Open Bible
         run = latest_run(speaker)
         saved = sorted(run.glob("checkpoint_*.pth"), key=lambda p: int(p.stem.split("_")[1]))
-        ckpt = str(run / "best_model.pth" if (run / "best_model.pth").exists() else saved[-1])
+        # la sauvegarde la plus récente : on poursuit là où l'entraînement s'est arrêté
+        ckpt = str(saved[-1] if saved else run / "best_model.pth")
         print(f"Reprise depuis {ckpt}", flush=True)
     data = out_dir(speaker) / "data"
     config = VitsConfig()
@@ -196,20 +204,65 @@ def train(speaker: str, epochs: int, batch: int, resume: bool = False, lr: float
     # données suffisaient à rendre la voix à moitié incompréhensible (52 % de lettres fausses).
     config.model_args.freeze_encoder = freeze_text
     # Points de sauvegarde réguliers : `check` choisit celui qui se comprend le mieux
-    config.print_step, config.save_step, config.save_n_checkpoints = 25, 250, 6
+    config.print_step, config.save_step, config.save_n_checkpoints = 25, 500, 3
     config.save_best_after = 500
     config.num_loader_workers = config.num_eval_loader_workers = 0   # Windows
     config.max_audio_len = 12 * RATE                # évite de saturer les 4 Go de VRAM
-    config.max_text_len = 400                       # la config d'origine met None, refusé par coqui-tts 0.28
+    # en symboles (avec les « blancs » insérés entre les lettres) : les versets bibliques dépassent 400
+    config.max_text_len = 1000                      # la config d'origine met None, refusé par coqui-tts 0.28
     config.dashboard_logger = "tensorboard"
 
     n = sum(1 for l in (data / "metadata.csv").read_text(encoding="utf-8").splitlines() if l.strip())
-    train_samples, eval_samples = load_tts_samples(config, eval_split=True, eval_split_size=min(0.1, 8 / n))
+    train_samples, eval_samples = load_tts_samples(config, eval_split=True, eval_split_size=min(0.1, max(8, n // 50) / n))
     model = Vits(config)  # coqui-tts >= 0.25 : construit lui-même l'AudioProcessor et le tokenizer
     print(f"Affinage sur {len(train_samples)} phrases (+{len(eval_samples)} pour l'évaluation)", flush=True)
     trainer = Trainer(TrainerArgs(restore_path=ckpt), config, config.output_path, model=model,
                       train_samples=train_samples, eval_samples=eval_samples)
+    if trainer.scaler is not None:
+        # En fp16, le trainer partage UNE échelle entre le juge (discriminateur) et la voix
+        # (générateur). La voix n'a des gradients finis qu'avec une échelle minuscule (~1e-8), qui
+        # réduit à zéro ceux du juge ; une échelle >= 1 bloque au contraire la voix (tous ses pas
+        # ignorés : une nuit entière sans un seul poids modifié). Une échelle par optimiseur.
+        trainer.scaler = _PerOptimizerScaler(len(trainer.optimizer))
     trainer.fit()
+
+
+class _PerOptimizerScaler:
+    """Une GradScaler par optimiseur, utilisée dans l'ordre où le trainer les appelle :
+    scale -> unscale_ -> step pour l'optimiseur 0, puis 1, ... ; update() après le dernier."""
+
+    def __init__(self, n: int):
+        import torch
+        self.scalers = [torch.GradScaler("cuda") for _ in range(n)]
+        self.cur, self.next = 0, 0
+
+    def scale(self, loss):
+        self.cur = self.next
+        return self.scalers[self.cur].scale(loss)
+
+    def unscale_(self, optimizer):
+        return self.scalers[self.cur].unscale_(optimizer)
+
+    def step(self, optimizer, *args, **kwargs):
+        self.next = (self.cur + 1) % len(self.scalers)
+        return self.scalers[self.cur].step(optimizer, *args, **kwargs)
+
+    def update(self, new_scale=None):
+        for s in self.scalers:
+            s.update(new_scale)
+        self.next = 0
+
+    def get_scale(self):
+        return self.scalers[self.cur].get_scale()
+
+    def state_dict(self):   # sauvegardée avec le modèle : l'échelle de la voix
+        return self.scalers[-1].state_dict()
+
+    def load_state_dict(self, state):
+        self.scalers[-1].load_state_dict(state)
+
+    def is_enabled(self):
+        return True
 
 
 def latest_run(speaker: str) -> Path:
@@ -321,8 +374,10 @@ if __name__ == "__main__":
     ap.add_argument("--no-freeze", action="store_true", help="entraîner aussi le lecteur de texte (lingala : déconseillé)")
     ap.add_argument("--max-clips", type=int, default=100000, help="prepare : nombre maximum de phrases")
     ap.add_argument("--fp16", action="store_true", help="calcul rapide en demi-précision")
+    ap.add_argument("--from", dest="start_from", help="train : repartir de cette sauvegarde (.pth)")
     a = ap.parse_args()
     {"prepare": lambda: prepare(a.speaker, a.max_clips),
-     "train": lambda: train(a.speaker, a.epochs, a.batch, a.resume, a.lr, False if a.no_freeze else None, a.fp16),
+     "train": lambda: train(a.speaker, a.epochs, a.batch, a.resume, a.lr, False if a.no_freeze else None, a.fp16,
+                               a.start_from),
      "check": lambda: check(a.speaker),
      "sample": lambda: sample(a.speaker)}[a.step]()

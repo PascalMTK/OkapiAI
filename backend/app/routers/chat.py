@@ -12,7 +12,8 @@ from ..database import get_db
 from ..schemas import ChatTurn, ConverseIn, TranslateIn, check_langs
 from ..services import conversation, translator
 from ..services.audio import save_audio
-from ..services.corpus import corpus
+from ..services import recordings
+from ..services.corpus import corpus, corpus_lua_voice
 from ..services.hearing import for_lang as hearing_for
 from ..services.speech import recognizer
 from ..services.tts import MAX_CHARS, synthesizer
@@ -97,6 +98,15 @@ def voice_start(lang: str = "auto"):
             "auto_detect": recognizer.auto_langs()}
 
 
+@router.get("/corpus/lua/{rel:path}")
+def corpus_lua_audio(rel: str):
+    """Enregistrement tshiluba du corpus Common Voice (CC0)."""
+    path = corpus_lua_voice.audio_path(rel)
+    if path is None:
+        raise HTTPException(404, "Enregistrement introuvable")
+    return FileResponse(path, media_type="audio/mpeg", headers={"Cache-Control": "public, max-age=604800"})
+
+
 def tts_url(text: str, lang: str):
     return f"/api/tts?lang={lang}&text={quote(text)}" if text and synthesizer.supports(lang) else None
 
@@ -123,7 +133,12 @@ def chat(body: TranslateIn, db: Session = Depends(get_db)):
     else:
         reply = (f"Je ne connais pas encore cette phrase en {tgt}. "
                  "Si vous la connaissez, ajoutez-la dans l'onglet « Contribuer » !")
-    return {"reply": reply, **res}
+    # phrases enregistrées du côté de la langue nationale (la cible, sinon la source)
+    nat, text = ((body.target_lang, res.get("translation") or body.text) if body.target_lang in CONGOLESE
+                 else (body.source_lang, body.text))
+    return {"reply": reply, **res,
+            "recordings": recordings.for_message(db, nat, text, exclude={res.get("translation") or ""}),
+            "recordings_lang": nat}
 
 
 @router.post("/voice/chat")
@@ -169,7 +184,15 @@ def converse(body: ConverseIn, db: Session = Depends(get_db)):
     """Converser en langue nationale : le système répond dans la même langue."""
     _check_conv_lang(body.lang)
     history = [t.model_dump() for t in body.history]
-    return _with_hint(conversation.converse(db, body.lang, body.message, history, voice=body.voice))
+    res = _with_hint(conversation.converse(db, body.lang, body.message, history, voice=body.voice))
+    if not body.voice:  # la voix live n'affiche pas ces exemples
+        # d'abord ce que l'utilisateur a dit, puis (s'il en manque) la réponse d'OkapiAI
+        recs = recordings.for_message(db, body.lang, body.message, exclude={res.get("reply") or ""})
+        if len(recs) < 3 and res.get("reply"):
+            recs += recordings.for_message(db, body.lang, res["reply"], k=3 - len(recs),
+                                           exclude={res["reply"], *(r["text"] for r in recs)})
+        res["recordings"] = recs
+    return res
 
 
 _history_adapter = TypeAdapter(list[ChatTurn])

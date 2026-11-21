@@ -403,6 +403,21 @@ def test_learner_hearing():
     assert lua.correct("moyo udi muimpe")["text"] == "moyo udi muimpe"
 
 
+def test_dataset_recordings():
+    """Sous une réponse, des phrases enregistrées du dataset, dans la bonne langue (corpus présents)."""
+    from app.services import recordings
+    from app.services.corpus import corpus
+    from app.database import SessionLocal
+    db = SessionLocal()
+    try:
+        assert recordings.for_message(db, "sw", "") == []
+        if corpus.size():  # LRSC présent (audio non versionné : peut manquer sur une autre machine)
+            for r in recordings.for_message(db, "ln", "mama azali kolamba bilei", k=3):
+                assert r["text"] and r["source"]
+    finally:
+        db.close()
+
+
 if __name__ == "__main__":
     test_learner_hearing()
     test_free_ai_relay()
@@ -411,4 +426,5 @@ if __name__ == "__main__":
     test_conversation_dialogue_and_ai()
     test_word_meaning()
     test_voice_live_conversation()
+    test_dataset_recordings()
     print("OK")

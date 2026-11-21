@@ -249,6 +249,23 @@ function appendBot(log, html, meta = "") {
 
 function clearPlaceholder(log) { $(".log-placeholder", log)?.remove(); $(".border-dashed", log)?.remove(); }
 
+// Phrases du dataset dites par de vrais locuteurs, proches du message (toutes les langues)
+function recordingsBlock(list) {
+  if (!list?.length) return "";
+  const items = list.map((r) => `<li class="flex items-start gap-2 py-1.5">
+      <button type="button" class="b-rec flex-shrink-0 w-7 h-7 rounded-full bg-amber-100 hover:bg-amber-200 dark:bg-okapi-yellow/15 dark:hover:bg-okapi-yellow/25 text-amber-800 dark:text-okapi-yellow flex items-center justify-center transition-colors cursor-pointer" data-url="${esc(r.audio_url)}" title="Écouter">
+        <i data-lucide="play" class="w-3.5 h-3.5"></i></button>
+      <span class="min-w-0"><span class="italic text-slate-800 dark:text-slate-200">« ${esc(r.text)} »</span>
+        ${r.translation ? `<span class="block text-slate-500 dark:text-slate-400">${esc(r.translation)}</span>` : ""}
+        <span class="block text-[10px] text-slate-400 dark:text-slate-500">${esc(r.source)}</span></span></li>`).join("");
+  return `<details class="mt-2.5 rounded-lg border border-amber-200/80 dark:border-okapi-yellow/20 bg-amber-50/60 dark:bg-okapi-yellow/5 px-3 py-2 text-xs">
+      <summary class="cursor-pointer font-semibold text-amber-800 dark:text-okapi-yellow">🎧 Dans le dataset · ${list.length} phrase${list.length > 1 ? "s" : ""} enregistrée${list.length > 1 ? "s" : ""}</summary>
+      <ul class="mt-1 divide-y divide-amber-200/60 dark:divide-okapi-yellow/10">${items}</ul></details>`;
+}
+function bindRecordings(body) {
+  $$(".b-rec", body).forEach((b) => (b.onclick = () => playUrl(b.dataset.url)));
+}
+
 const audioTag = (url) => (url ? `<audio controls preload="none" src="${esc(url)}" class="mt-2 h-8 w-full max-w-xs"></audio>` : "");
 const smallBtn = "inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-okapi-blue/15 dark:hover:bg-okapi-blue/25 text-blue-800 dark:text-okapi-cyan border border-blue-200 dark:border-okapi-blue/30 text-xs font-bold transition-colors cursor-pointer";
 const inputCls = "w-full bg-slate-50 dark:bg-obsidian-950 border border-slate-300 dark:border-okapi-blue/25 focus:border-okapi-blue rounded-lg px-3 py-1.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none";
@@ -311,13 +328,15 @@ function renderAnswer(log, lang, userMsg, a, key) {
           <span class="font-bold text-amber-800 dark:text-okapi-yellow">📖 Exemple, lu par un locuteur :</span>
           <span class="italic text-slate-800 dark:text-slate-200">« ${esc(a.example.text)} »</span>
           <span class="block text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">${esc(a.example.source)}</span>
-          ${audioTag(a.example.audio_url)}</div>` : ""}`
-    : `<p>🤔 ${esc(a.hint || "Je ne sais pas encore répondre.")}</p>`;
+          ${audioTag(a.example.audio_url)}</div>` : ""}
+       ${recordingsBlock(a.recordings)}`
+    : `<p>🤔 ${esc(a.hint || "Je ne sais pas encore répondre.")}</p>${recordingsBlock(a.recordings)}`;
   const listen = a.reply && (a.tts_url || a.audio_url)
     ? `<button type="button" class="b-listen ${smallBtn}"><i data-lucide="volume-2" class="w-3.5 h-3.5"></i>Écouter</button>` : "";
   const body = appendBot(log, html + `<div class="mt-2.5 flex flex-wrap gap-2">${listen}<button type="button" class="b-teach ${smallBtn}">
       <i data-lucide="${a.reply ? "pencil" : "graduation-cap"}" class="w-3.5 h-3.5"></i>${a.reply ? "Corriger" : "Apprendre une réponse"}</button></div>`, meta);
   $(".b-teach", body).onclick = () => showTeach(body, lang, userMsg, a.reply);
+  bindRecordings(body);
   const say = () => (a.audio_url ? playUrl(a.audio_url) : speak(a.reply, lang, a.tts_url));
   if ($(".b-listen", body)) $(".b-listen", body).onclick = say;
   if (!a.reply) return Promise.resolve();
@@ -389,7 +408,7 @@ function initChat() {
     if (converse) return sendConverse(log, src.value, text, "chat");
     try {
       const r = await api("/api/chat", { method: "POST", json: { text, source_lang: src.value, target_lang: tgt.value } });
-      appendBot(log, `<p>${esc(r.reply)}</p>${audioTag(r.audio_url)}`, translationMeta(r));
+      bindRecordings(appendBot(log, `<p>${esc(r.reply)}</p>${audioTag(r.audio_url)}${recordingsBlock(r.recordings)}`, translationMeta(r)));
       if (r.translation) speak(r.translation, r.target_lang, r.audio_url ? null : ttsFor(r.translation, r.target_lang));
     } catch (err) { appendBot(log, `<p>⚠️ ${esc(err.message)}</p>`); }
   });

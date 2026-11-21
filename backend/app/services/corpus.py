@@ -30,8 +30,10 @@ _AUDIO = re.compile(r"^(train|validation|test)/[A-Za-z0-9_.-]+\.wav$")
 
 class Corpus:
     def __init__(self, meta=LRSC_DIR / "metadata.jsonl", field: str = "lingala", source: str = SOURCE,
-                 language: str = "lingala"):
+                 language: str = "lingala", audio_dir=LRSC_DIR, audio_re=_AUDIO,
+                 audio_prefix: str = "sources/lrsc/", url: str = "/api/corpus/audio/"):
         self.meta, self.field, self.source, self.language = meta, field, source, language
+        self.audio_dir, self.audio_re, self.audio_prefix, self.url = audio_dir, audio_re, audio_prefix, url
         self._lock = threading.Lock()
         self._rows: Optional[list[dict]] = None
         self._index: dict[str, list[int]] = {}
@@ -51,9 +53,9 @@ class Corpus:
                     text = (r.get(self.field) or "").strip()
                     if len(text.split()) < 3:  # trop court pour servir d'exemple
                         continue
-                    audio = (r.get("audio") or "").removeprefix("sources/lrsc/")
+                    audio = (r.get("audio") or "").removeprefix(self.audio_prefix)
                     rows.append({"text": text, "tokens": set(key(text).split()),
-                                 "audio": audio if _AUDIO.match(audio) else None,
+                                 "audio": audio if self.audio_re.match(audio) else None,
                                  "speaker": r.get("speaker_id")})
             index: dict[str, list[int]] = defaultdict(list)
             for i, r in enumerate(rows):
@@ -102,18 +104,23 @@ class Corpus:
 
     def audio_path(self, rel: str):
         """Chemin d'un enregistrement du corpus, ou None (nom invalide / fichier absent)."""
-        if not _AUDIO.match(rel or ""):
+        if not self.audio_re.match(rel or ""):
             return None
-        path = (LRSC_DIR / rel).resolve()
-        return path if path.is_file() and LRSC_DIR.resolve() in path.parents else None
+        path = (self.audio_dir / rel).resolve()
+        return path if path.is_file() and self.audio_dir.resolve() in path.parents else None
 
     def _public(self, r: dict) -> dict:
         # l'audio n'est pas versionné (git) : on ne propose l'écoute que si le fichier est là
-        has_audio = bool(r["audio"]) and (LRSC_DIR / r["audio"]).is_file()
+        has_audio = bool(r["audio"]) and (self.audio_dir / r["audio"]).is_file()
         return {"text": r["text"], "source": self.source,
-                "audio_url": f"/api/corpus/audio/{r['audio']}" if has_audio else None}
+                "audio_url": f"{self.url}{r['audio']}" if has_audio else None}
 
 
 corpus = Corpus()
+# enregistrements tshiluba Common Voice (CC0), extraits par tools/import_tshiluba.py --audio
+_TSH = DATASET_DIR / "sources" / "tshiluba"
+corpus_lua_voice = Corpus(_TSH / "audio.jsonl", "text", "Common Voice, CC0", "tshiluba", audio_dir=_TSH,
+                          audio_re=re.compile(r"^audio/common_voice_lua_[0-9]+\.mp3$"), audio_prefix="",
+                          url="/api/corpus/lua/")
 corpus_lua = Corpus(DATASET_DIR / "sources" / "tshiluba" / "phrases.jsonl", "text",
                     "corpus DanMM96, CC BY 4.0, surtout biblique", "tshiluba")

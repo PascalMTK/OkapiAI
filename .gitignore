@@ -28,3 +28,5 @@ dataset/vocab_candidates.jsonl
 # Échantillons de test des voix (générés en local)
 comparaison-voix/
 dataset/sources/tshiluba/corpus_brut.txt
+dataset/sources/tshiluba/audio/
+dataset/sources/tshiluba/audio.jsonl
