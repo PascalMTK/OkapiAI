@@ -72,6 +72,20 @@ def _migrate() -> None:
         log.info("Migration : un vote par personne (%d doublon(s) fusionné(s))", removed)
 
 
+def _warm_language_data() -> None:
+    try:
+        from .services.corpus import corpus, corpus_lua
+        from .services.hearing import for_lang
+        from .services.lexicon import lexicon
+        lexicon.size(), corpus.size(), corpus_lua.size()
+        for lang in ("ln", "lua"):
+            h = for_lang(lang)
+            if h is not None:
+                h.correct("mbote")
+    except Exception as exc:  # jamais bloquant : tout se chargera au 1er message
+        log.warning("Préchargement des données de langue : %s", exc)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     Base.metadata.create_all(engine)
@@ -82,6 +96,8 @@ async def lifespan(_: FastAPI):
     if os.getenv("OKAPI_VOICE_WARMUP", "1") == "1":
         # Charge la reconnaissance vocale et les voix sans bloquer le démarrage du serveur
         threading.Thread(target=lambda: (recognizer.warmup(), synthesizer.warmup()), daemon=True).start()
+        # Dictionnaire et corpus chargés d'avance : sinon le 1er message après un démarrage attend ~10 s
+        threading.Thread(target=_warm_language_data, daemon=True).start()
         # Entraînement d'une voix en cours : les modèles laissent la carte graphique, puis y reviennent
         from .services.gpu import watch
         watch([recognizer.mms.move, recognizer.lua.move, synthesizer.move])
