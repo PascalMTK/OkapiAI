@@ -16,7 +16,7 @@ from ..services import recordings
 from ..services.corpus import corpus, corpus_lua_voice
 from ..services.hearing import for_lang as hearing_for
 from ..services.speech import recognizer
-from ..services.tts import MAX_CHARS, display_text, split_voices, synthesizer
+from ..services.tts import MAX_CHARS, SAME_VOICE_FR, display_text, split_voices, synthesizer
 
 router = APIRouter(prefix="/api", tags=["chat"])
 AUTO = "auto"  # voix live : détecter la langue nationale parlée
@@ -179,8 +179,10 @@ def _with_hint(res: dict) -> dict:
     res["tts_url"] = None if res.get("audio_url") else tts_url(res.get("reply"), res["lang"])
     # morceaux à dire chacun avec la voix de sa langue (mots français -> voix française, puis relais)
     segs = [] if res.get("audio_url") else split_voices(raw, res["lang"])
-    # les mots français gardent la voix de la conversation (`voice`) ; repli : voix française
-    res["speech"] = [{**s, "tts_url": tts_url(s["text"], s["lang"], voice=res["lang"] if s["lang"] == "fr" else None)}
+    # chaque morceau avec la voix de SA langue : les mots français par la voix française
+    # (OKAPI_TTS_FR_SAME_VOICE=1 : par la voix de la conversation, timbre converti)
+    res["speech"] = [{**s, "tts_url": tts_url(s["text"], s["lang"],
+                                              voice=res["lang"] if s["lang"] == "fr" and SAME_VOICE_FR else None)}
                      for s in segs] \
         if len(segs) > 1 or (segs and segs[0]["lang"] != res["lang"]) else None
     if res["reply"] is None:

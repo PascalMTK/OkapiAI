@@ -42,9 +42,9 @@ REMOTE = {lang: url.rstrip("/") for lang in ("ln", "sw", "lua")
           if (url := os.getenv(f"OKAPI_TTS_{lang.upper()}_URL"))}
 if "lua" in VOICES and "lua" not in REMOTE and "ln" in REMOTE:
     REMOTE["lua"] = REMOTE["ln"]
-# Mots français cités dans une réponse : dits par la même voix que la langue nationale (défaut),
-# OKAPI_TTS_FR_SAME_VOICE=0 pour utiliser la voix française MMS à la place.
-SAME_VOICE_FR = os.getenv("OKAPI_TTS_FR_SAME_VOICE", "1") != "0"
+# Mots français cités dans une réponse : dits par la voix française MMS (défaut). Les voix des langues
+# nationales ne disent que leur langue. OKAPI_TTS_FR_SAME_VOICE=1 : voix de la conversation à la place.
+SAME_VOICE_FR = os.getenv("OKAPI_TTS_FR_SAME_VOICE", "0") == "1"
 AUTO_DOWNLOAD = os.getenv("OKAPI_TTS_AUTO_DOWNLOAD") == "1"
 ENABLED = os.getenv("OKAPI_TTS", "on") != "off"
 TTS_DIR = AUDIO_DIR / "tts"

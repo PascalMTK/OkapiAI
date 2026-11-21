@@ -34,7 +34,8 @@ MAX_CHARS = 600
 NOISE, NOISE_DP = 0.4, 0.3   # modifiables : --noise / --noise-dp
 FR_VOICE = "facebook/mms-tts-fra"                                       # prononce le français
 VC_MODEL = "voice_conversion_models/multilingual/multi-dataset/openvoice_v2"  # lui donne notre timbre
-USE_VC = True                # --no-vc : mots français par simple réécriture phonétique
+USE_VC = False               # --vc : mots français avec le timbre de cette voix (désactivé : le français
+                             # garde sa propre voix, voir OKAPI_TTS_FR_SAME_VOICE côté backend)
 
 # Les voix n'ont appris que des lettres : un chiffre (« 2 bato », « 2026 ») faisait échouer la phrase
 # entière, et OkapiAI se rabattait sur la voix de secours, bien plus lente. On les dit en toutes lettres.
@@ -282,9 +283,9 @@ if __name__ == "__main__":
     ap.add_argument("--port", type=int, default=8100)
     ap.add_argument("--noise", type=float, default=NOISE, help="hasard du timbre (défaut du modèle : 0.667)")
     ap.add_argument("--noise-dp", type=float, default=NOISE_DP, help="hasard du rythme (défaut du modèle : 1.0)")
-    ap.add_argument("--no-vc", action="store_true", help="mots français sans conversion de voix")
+    ap.add_argument("--vc", action="store_true", help="mots français avec le timbre de cette voix (conversion)")
     a = ap.parse_args()
-    NOISE, NOISE_DP, USE_VC = a.noise, a.noise_dp, not a.no_vc
+    NOISE, NOISE_DP, USE_VC = a.noise, a.noise_dp, a.vc
     voice = Voice(a.speaker)
     server = ThreadingHTTPServer(("127.0.0.1", a.port), make_handler(voice))
     print(f"Serveur de voix ({a.speaker}) sur http://127.0.0.1:{a.port}", flush=True)
