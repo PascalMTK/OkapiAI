@@ -282,8 +282,8 @@ function stopSpeaking() {
 // Une longue réponse est dite phrase par phrase : la 1re phrase se synthétise vite et commence
 // à jouer pendant que la suivante se prépare (au lieu d'attendre toute la réponse).
 function ttsChunks(text, url) {
-  const m = /^\/api\/tts\?lang=([^&]+)&text=/.exec(url || "");
-  if (!m || !text || text.length < 90) return url ? [url] : [];
+  if (!url?.startsWith("/api/tts?") || !text || text.length < 90) return url ? [url] : [];
+  const params = new URLSearchParams(url.slice("/api/tts?".length));   // lang, voice… (le texte change)
   const parts = text.match(/[^.!?…]+[.!?…]+["»”)]*\s*|[^.!?…]+$/g) || [text];
   const chunks = [];
   for (const p of parts.map((s) => s.trim()).filter(Boolean)) {
@@ -291,7 +291,7 @@ function ttsChunks(text, url) {
     if (chunks.length && chunks[chunks.length - 1].length < 25) chunks[chunks.length - 1] += " " + p;
     else chunks.push(p);
   }
-  return chunks.map((c) => `/api/tts?lang=${m[1]}&text=${encodeURIComponent(c.slice(0, 600))}`);
+  return chunks.map((c) => { params.set("text", c.slice(0, 600)); return `/api/tts?${params}`; });
 }
 const BROWSER_VOICE = { fr: "fr-FR", sw: "sw-KE" };
 const canBrowserSay = (lang) => "speechSynthesis" in window && lang in BROWSER_VOICE;

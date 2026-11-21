@@ -15,11 +15,13 @@ Résultat : backend/models/voix-<speaker>/run-*/checkpoint_*.pth ; `check` fait 
            la seule voix affinée que sert tools/voice_server.py (sinon : la voix d'origine).
 """
 import argparse
+import contextlib
 import json
 import os
 import re
 import subprocess
 import sys
+import time
 import unicodedata
 from pathlib import Path
 from typing import Optional
@@ -52,6 +54,53 @@ TSHILUBA_VOIX = Path(os.getenv("OKAPI_TSHILUBA_VOIX", "D:/okapi-data/tshiluba-vo
 
 def lang_of(speaker: str) -> str:
     return LANG_OF.get(speaker, "ln")
+
+
+# Pendant un entraînement, ce fichier dit au site (backend, voice_server) de laisser la carte graphique
+# (4 Go) : leurs modèles passent sur le processeur, puis reviennent. Même chemin que app/services/gpu.py.
+TRAINING_FLAG = ROOT / "backend" / "models" / "entrainement-en-cours.json"
+
+
+def _alive(pid: int) -> bool:
+    if os.name == "nt":
+        import ctypes
+        k = ctypes.windll.kernel32
+        h = k.OpenProcess(0x1000, False, pid)   # PROCESS_QUERY_LIMITED_INFORMATION
+        if not h:
+            return False
+        code = ctypes.c_ulong()
+        ok = k.GetExitCodeProcess(h, ctypes.byref(code))
+        k.CloseHandle(h)
+        return bool(ok) and code.value == 259    # STILL_ACTIVE
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
+def training_active() -> bool:
+    try:
+        return _alive(int(json.loads(TRAINING_FLAG.read_text(encoding="utf-8"))["pid"]))
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+
+
+@contextlib.contextmanager
+def gpu_for_training(speaker: str, wait_s: float = 20.0):
+    """Annonce l'entraînement, laisse ~20 s aux serveurs pour libérer la carte, nettoie à la fin."""
+    TRAINING_FLAG.parent.mkdir(parents=True, exist_ok=True)
+    TRAINING_FLAG.write_text(json.dumps({"pid": os.getpid(), "speaker": speaker,
+                                         "since": time.strftime("%Y-%m-%d %H:%M")}), encoding="utf-8")
+    print(f"Carte graphique demandée au site ({wait_s:.0f} s)…", flush=True)
+    time.sleep(wait_s)
+    try:
+        yield
+    finally:
+        try:
+            TRAINING_FLAG.unlink()
+        except OSError:
+            pass
 
 
 def out_dir(speaker: str) -> Path:
@@ -364,6 +413,11 @@ def check(speaker: str) -> None:
     print(f"Validée : {best.name} ({scores[best.name]:.0%}) -> {run / 'approved_model.pth'}")
 
 
+def _with_gpu(speaker: str, run) -> None:
+    with gpu_for_training(speaker):
+        run()
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("step", choices=["prepare", "train", "check", "sample"])
@@ -379,7 +433,8 @@ if __name__ == "__main__":
     ap.add_argument("--save-step", type=int, default=500, help="train : une sauvegarde tous les N pas")
     a = ap.parse_args()
     {"prepare": lambda: prepare(a.speaker, a.max_clips),
-     "train": lambda: train(a.speaker, a.epochs, a.batch, a.resume, a.lr, False if a.no_freeze else None, a.fp16,
-                               a.start_from, a.save_step),
+     "train": lambda: _with_gpu(a.speaker, lambda: train(a.speaker, a.epochs, a.batch, a.resume, a.lr,
+                                                             False if a.no_freeze else None, a.fp16,
+                                                             a.start_from, a.save_step)),
      "check": lambda: check(a.speaker),
      "sample": lambda: sample(a.speaker)}[a.step]()

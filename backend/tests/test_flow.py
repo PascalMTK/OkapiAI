@@ -264,7 +264,7 @@ def test_voice_live_conversation():
         rec.supports = lambda lang: lang in ("ln", "sw")
         rec.transcribe = lambda path, lang: "mbote"
         syn.supports = lambda lang: lang in ("ln", "sw")
-        syn.synthesize = lambda text, lang: wav if lang in ("ln", "sw") else None
+        syn.synthesize = lambda text, lang, voice=None: wav if lang in ("ln", "sw") else None
         fake = ("a.webm", b"\x1a\x45\xdf\xa3fake-webm", "audio/webm")
         with TestClient(app) as c:
             caps = c.get("/api/voice/capabilities").json()
@@ -435,7 +435,26 @@ def test_phrase_translation_and_voices():
     assert split_voices("Mbote !", "ln") == [{"lang": "ln", "text": "Mbote !"}]
 
 
+def test_gpu_released_during_training():
+    """Le fichier d'entraînement n'est pris en compte que si son processus tourne encore."""
+    import json as _json
+    from app.services import gpu
+    flag = gpu.TRAINING_FLAG
+    if flag.exists():   # un vrai entraînement tourne : ne pas y toucher
+        return
+    flag.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        flag.write_text(_json.dumps({"pid": os.getpid()}), encoding="utf-8")
+        assert gpu.training_active() and gpu.preferred_device() == "cpu"
+        flag.write_text(_json.dumps({"pid": 999999}), encoding="utf-8")   # entraînement planté
+        assert not gpu.training_active()
+        assert gpu.preferred_device("cuda") == "cuda"                      # choix imposé respecté
+    finally:
+        flag.unlink()
+
+
 if __name__ == "__main__":
+    test_gpu_released_during_training()
     test_phrase_translation_and_voices()
     test_learner_hearing()
     test_free_ai_relay()

@@ -50,11 +50,13 @@ def voice_capabilities():
 
 
 @router.get("/tts")
-def tts(text: str = Query(..., min_length=1, max_length=MAX_CHARS), lang: str = Query(...)):
-    """Fait parler OkapiAI : renvoie la phrase prononcée (WAV) dans la langue nationale."""
-    if lang not in LANGUAGES:
+def tts(text: str = Query(..., min_length=1, max_length=MAX_CHARS), lang: str = Query(...),
+        voice: str = Query(None)):
+    """Fait parler OkapiAI : renvoie la phrase prononcée (WAV) dans la langue nationale.
+    `voice` : pour un texte français, la langue nationale dont la voix le dit (même voix que la conversation)."""
+    if lang not in LANGUAGES or (voice and voice not in CONGOLESE):
         raise HTTPException(400, "Langue inconnue")
-    path = synthesizer.synthesize(text, lang)
+    path = synthesizer.synthesize(text, lang, voice=voice)
     if path is None:
         raise HTTPException(404, f"Pas de voix disponible pour le {LANGUAGES[lang].lower()}")
     # voix affinée : elle évolue pendant l'entraînement, le navigateur ne doit pas la garder
@@ -107,8 +109,10 @@ def corpus_lua_audio(rel: str):
     return FileResponse(path, media_type="audio/mpeg", headers={"Cache-Control": "public, max-age=604800"})
 
 
-def tts_url(text: str, lang: str):
-    return f"/api/tts?lang={lang}&text={quote(text)}" if text and synthesizer.supports(lang) else None
+def tts_url(text: str, lang: str, voice: str = None):
+    if not text or not synthesizer.supports(lang):
+        return None
+    return f"/api/tts?lang={lang}&text={quote(text)}" + (f"&voice={voice}" if voice and voice != lang else "")
 
 
 @router.post("/translate")
@@ -175,7 +179,9 @@ def _with_hint(res: dict) -> dict:
     res["tts_url"] = None if res.get("audio_url") else tts_url(res.get("reply"), res["lang"])
     # morceaux à dire chacun avec la voix de sa langue (mots français -> voix française, puis relais)
     segs = [] if res.get("audio_url") else split_voices(raw, res["lang"])
-    res["speech"] = [{**s, "tts_url": tts_url(s["text"], s["lang"])} for s in segs] \
+    # les mots français gardent la voix de la conversation (`voice`) ; repli : voix française
+    res["speech"] = [{**s, "tts_url": tts_url(s["text"], s["lang"], voice=res["lang"] if s["lang"] == "fr" else None)}
+                     for s in segs] \
         if len(segs) > 1 or (segs and segs[0]["lang"] != res["lang"]) else None
     if res["reply"] is None:
         res["hint"] = ("Je ne sais pas encore répondre à ce message dans cette langue. "

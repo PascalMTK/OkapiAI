@@ -31,6 +31,7 @@ MMS_MODEL = os.getenv("OKAPI_ASR_MODEL") or (str(_LOCAL_MMS) if (_LOCAL_MMS / "m
 AUTO_DOWNLOAD = os.getenv("OKAPI_ASR_AUTO_DOWNLOAD") == "1"
 # auto = carte graphique si disponible ; cpu = processeur (utile quand la carte est occupée, ~4 s/phrase)
 ASR_DEVICE = os.getenv("OKAPI_ASR_DEVICE", "auto")
+from .gpu import preferred_device  # noqa: E402
 SURE = 0.92  # détection automatique : au-delà de cette confiance, inutile d'essayer l'autre langue
 # La 1re langue (le lingala) l'emporte à confiance presque égale : sur une phrase courte comme
 # « mbote », le swahili gagnait d'un cheveu (0,674 contre 0,672) avec une transcription absurde.
@@ -99,7 +100,7 @@ class MMSRecognizer:
         try:
             import torch
             from transformers import AutoProcessor, Wav2Vec2ForCTC
-            self._device = ASR_DEVICE if ASR_DEVICE in ("cpu", "cuda") else ("cuda" if torch.cuda.is_available() else "cpu")
+            self._device = preferred_device(ASR_DEVICE)   # cpu pendant un entraînement des voix
             if self._device == "cpu":
                 torch.set_num_threads(max(2, (os.cpu_count() or 4) - 2))
             self._proc = AutoProcessor.from_pretrained(MMS_MODEL, target_lang="lin")
@@ -111,6 +112,18 @@ class MMSRecognizer:
         except Exception as exc:
             log.warning("Reconnaissance vocale MMS indisponible : %s", exc)
             self._failed = True
+
+    def move(self, device: str) -> None:
+        """Passe sur `device` (cpu pendant un entraînement des voix, cuda ensuite)."""
+        import torch
+        if ASR_DEVICE in ("cpu", "cuda"):
+            return  # choix imposé par OKAPI_ASR_DEVICE
+        with self._lock:
+            if self._model is None or self._device == device:
+                return
+            self._model = self._model.to(device, torch.float16 if device == "cuda" else torch.float32)
+            self._device = device
+            log.info("%s déplacé sur %s", type(self).__name__, device)
 
     def _use(self, code: str):
         if self._adapter != code:
@@ -222,7 +235,7 @@ class TshilubaRecognizer:
         try:
             import torch
             from transformers import WhisperForConditionalGeneration, WhisperProcessor
-            self._device = ASR_DEVICE if ASR_DEVICE in ("cpu", "cuda") else ("cuda" if torch.cuda.is_available() else "cpu")
+            self._device = preferred_device(ASR_DEVICE)   # cpu pendant un entraînement des voix
             dtype = torch.float16 if self._device == "cuda" else torch.float32
             self._proc = WhisperProcessor.from_pretrained(_LUA_MODEL)
             self._model = WhisperForConditionalGeneration.from_pretrained(_LUA_MODEL, torch_dtype=dtype).to(self._device).eval()
@@ -230,6 +243,18 @@ class TshilubaRecognizer:
         except Exception as exc:
             log.warning("Reconnaissance tshiluba indisponible : %s", exc)
             self._failed = True
+
+    def move(self, device: str) -> None:
+        """Passe sur `device` (cpu pendant un entraînement des voix, cuda ensuite)."""
+        import torch
+        if ASR_DEVICE in ("cpu", "cuda"):
+            return  # choix imposé par OKAPI_ASR_DEVICE
+        with self._lock:
+            if self._model is None or self._device == device:
+                return
+            self._model = self._model.to(device, torch.float16 if device == "cuda" else torch.float32)
+            self._device = device
+            log.info("%s déplacé sur %s", type(self).__name__, device)
 
     def transcribe_array(self, audio) -> Optional[str]:
         import torch

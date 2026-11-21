@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Optional
 
 from ..config import AUDIO_DIR
+from .gpu import preferred_device
 
 log = logging.getLogger("okapiai.tts")
 
@@ -41,6 +42,9 @@ REMOTE = {lang: url.rstrip("/") for lang in ("ln", "sw", "lua")
           if (url := os.getenv(f"OKAPI_TTS_{lang.upper()}_URL"))}
 if "lua" in VOICES and "lua" not in REMOTE and "ln" in REMOTE:
     REMOTE["lua"] = REMOTE["ln"]
+# Mots français cités dans une réponse : dits par la même voix que la langue nationale (défaut),
+# OKAPI_TTS_FR_SAME_VOICE=0 pour utiliser la voix française MMS à la place.
+SAME_VOICE_FR = os.getenv("OKAPI_TTS_FR_SAME_VOICE", "1") != "0"
 AUTO_DOWNLOAD = os.getenv("OKAPI_TTS_AUTO_DOWNLOAD") == "1"
 ENABLED = os.getenv("OKAPI_TTS", "on") != "off"
 TTS_DIR = AUDIO_DIR / "tts"
@@ -167,12 +171,21 @@ class Synthesizer:
         if lang not in self._voices:
             import torch
             from transformers import AutoTokenizer, VitsModel
-            device = "cuda" if torch.cuda.is_available() and os.getenv("OKAPI_TTS_DEVICE") != "cpu" else "cpu"
+            device = preferred_device(os.getenv("OKAPI_TTS_DEVICE", "auto"))   # cpu pendant un entraînement
             tok = AutoTokenizer.from_pretrained(VOICES[lang])
             model = VitsModel.from_pretrained(VOICES[lang]).to(device).eval()  # ~150 Mo
             self._voices[lang] = (tok, model)
             log.info("Voix %s chargée (%s, %s)", lang, VOICES[lang], device)
         return self._voices[lang]
+
+    def move(self, device: str) -> None:
+        """Voix MMS chargées -> `device` (cpu pendant un entraînement des voix, cuda ensuite)."""
+        if os.getenv("OKAPI_TTS_DEVICE", "auto") in ("cpu", "cuda"):
+            return
+        with self._lock:
+            for lang, (tok, model) in list(self._voices.items()):
+                if model.device.type != device:
+                    self._voices[lang] = (tok, model.to(device))
 
     def warmup(self) -> None:
         """Charge les voix disponibles à l'avance (appelé au démarrage, en arrière-plan)."""
@@ -189,13 +202,17 @@ class Synthesizer:
         digest = hashlib.sha1(f"{CACHE_VERSION}|{engine}|{lang}|{text}".encode("utf-8")).hexdigest()[:24]
         return TTS_DIR / f"{lang}-{engine}-{digest}.wav"
 
-    def _synthesize_remote(self, text: str, lang: str) -> Optional[Path]:
+    def _synthesize_remote(self, text: str, lang: str, text_lang: str = "") -> Optional[Path]:
+        """Voix externe de `lang` ; `text_lang="fr"` : elle dit un texte français (même voix)."""
         import urllib.parse
         import urllib.request
         # pas de cache : la voix affinée change pendant l'entraînement
-        path = TTS_DIR / f"{lang}-remote-{hashlib.sha1(text.encode('utf-8')).hexdigest()[:24]}.wav"
+        tag = f"{lang}-{text_lang}" if text_lang else lang
+        path = TTS_DIR / f"{tag}-remote-{hashlib.sha1(text.encode('utf-8')).hexdigest()[:24]}.wav"
         try:
             url = f"{REMOTE[lang]}/tts?text={urllib.parse.quote(text)}"
+            if text_lang:
+                url += f"&lang={text_lang}"
             with urllib.request.urlopen(url, timeout=30) as r:
                 data = r.read()
         except Exception as exc:
@@ -206,10 +223,18 @@ class Synthesizer:
         path.write_bytes(data)
         return path
 
-    def synthesize(self, text: str, lang: str) -> Optional[Path]:
-        """Fichier WAV de `text` prononcé dans `lang`, ou None si impossible."""
+    def synthesize(self, text: str, lang: str, voice: Optional[str] = None) -> Optional[Path]:
+        """Fichier WAV de `text` prononcé dans `lang`, ou None si impossible.
+        `voice` (texte français seulement) : la voix de la langue nationale de la conversation dit
+        aussi les mots français, pour garder la même voix ; sinon voix française MMS."""
         text = " ".join((text or "").split())[:MAX_CHARS]
-        if not text or not self.supports(lang):
+        if not text:
+            return None
+        if lang == "fr" and voice and SAME_VOICE_FR and self._remote_ok(voice):
+            path = self._synthesize_remote(text, voice, text_lang="fr")
+            if path is not None:
+                return path
+        if not self.supports(lang):
             return None
         if self.engine(lang) == "remote":
             path = self._synthesize_remote(text, lang)

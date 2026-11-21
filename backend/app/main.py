@@ -82,6 +82,9 @@ async def lifespan(_: FastAPI):
     if os.getenv("OKAPI_VOICE_WARMUP", "1") == "1":
         # Charge la reconnaissance vocale et les voix sans bloquer le démarrage du serveur
         threading.Thread(target=lambda: (recognizer.warmup(), synthesizer.warmup()), daemon=True).start()
+        # Entraînement d'une voix en cours : les modèles laissent la carte graphique, puis y reviennent
+        from .services.gpu import watch
+        watch([recognizer.mms.move, recognizer.lua.move, synthesizer.move])
     yield
 
 
