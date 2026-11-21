@@ -293,17 +293,40 @@ function ttsChunks(text, url) {
   }
   return chunks.map((c) => `/api/tts?lang=${m[1]}&text=${encodeURIComponent(c.slice(0, 600))}`);
 }
-// Joue des URL à la suite ; la suivante est déjà téléchargée pendant la lecture de la précédente.
+const BROWSER_VOICE = { fr: "fr-FR", sw: "sw-KE" };
+const canBrowserSay = (lang) => "speechSynthesis" in window && lang in BROWSER_VOICE;
+// Ce qu'il faut dire, morceau par morceau : [{url}] (voix OkapiAI) ou [{say, lang}] (voix du navigateur).
+// `speech` (du serveur) : une réponse qui cite des mots français est dite par la voix française pour
+// ces mots, puis la voix de la langue nationale reprend la suite.
+function speechPlan(text, lang, url, speech) {
+  if (speech?.length) {
+    return speech.flatMap((s) => (s.tts_url ? ttsChunks(s.text, s.tts_url).map((u) => ({ url: u }))
+      : canBrowserSay(s.lang) ? [{ say: s.text, lang: s.lang }] : []));
+  }
+  if (url) return ttsChunks(text, url).map((u) => ({ url: u }));
+  return text && canBrowserSay(lang) ? [{ say: text, lang }] : [];
+}
+// Joue le plan à la suite ; l'audio suivant est déjà téléchargé pendant la lecture du précédent.
 // `onAudio(a)` permet de brancher chaque lecteur (orbe animé) ; `isStopped()` arrête la suite.
-async function playChunks(urls, onAudio, isStopped) {
-  let next = urls.length ? new Audio(urls[0]) : null;
-  for (let i = 0; i < urls.length && next; i++) {
-    const a = next;
-    next = i + 1 < urls.length ? new Audio(urls[i + 1]) : null;
-    if (next) next.preload = "auto";
+async function playChunks(items, onAudio, isStopped) {
+  const load = (it) => (it?.url ? Object.assign(new Audio(it.url), { preload: "auto" }) : null);
+  let next = load(items[0]);
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i], a = next;
+    next = load(items[i + 1]);
     if (isStopped()) return;
-    onAudio(a);
-    await new Promise((resolve) => { a.onended = a.onerror = resolve; a.play().catch(resolve); });
+    if (a) {
+      onAudio(a);
+      await new Promise((resolve) => { a.onended = a.onerror = resolve; a.play().catch(resolve); });
+    } else {
+      onAudio(null);
+      await new Promise((resolve) => {
+        const u = new SpeechSynthesisUtterance(it.say);
+        u.lang = BROWSER_VOICE[it.lang];
+        u.onend = u.onerror = resolve;
+        speechSynthesis.speak(u);
+      });
+    }
   }
 }
 function playUrl(url) {
@@ -319,20 +342,10 @@ function playUrl(url) {
 const ttsFor = (text, lang) => (text && state.voiceCaps?.tts?.includes(lang)
   ? `/api/tts?lang=${encodeURIComponent(lang)}&text=${encodeURIComponent(text.slice(0, 600))}` : null);
 
-function speak(text, lang, ttsUrl) {
-  if (ttsUrl) {
-    stopSpeaking();
-    const token = speakToken;
-    return playChunks(ttsChunks(text, ttsUrl), (a) => (currentAudio = a), () => token !== speakToken);
-  }
-  return new Promise((resolve) => {
-    if (!text || !("speechSynthesis" in window) || !["fr", "sw"].includes(lang)) return resolve();
-    stopSpeaking();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = lang === "fr" ? "fr-FR" : "sw-KE";
-    u.onend = u.onerror = () => resolve();
-    speechSynthesis.speak(u);
-  });
+function speak(text, lang, ttsUrl, speech) {
+  stopSpeaking();
+  const token = speakToken;
+  return playChunks(speechPlan(text, lang, ttsUrl, speech), (a) => (currentAudio = a), () => token !== speakToken);
 }
 
 // Réponse de traduction
@@ -369,7 +382,7 @@ function renderAnswer(log, lang, userMsg, a, key) {
       <i data-lucide="${a.reply ? "pencil" : "graduation-cap"}" class="w-3.5 h-3.5"></i>${a.reply ? "Corriger" : "Apprendre une réponse"}</button></div>`, meta);
   $(".b-teach", body).onclick = () => showTeach(body, lang, userMsg, a.reply);
   bindRecordings(body);
-  const say = () => (a.audio_url ? playUrl(a.audio_url) : speak(a.reply, lang, a.tts_url));
+  const say = () => (a.audio_url ? playUrl(a.audio_url) : speak(a.reply, lang, a.tts_url, a.speech));
   if ($(".b-listen", body)) $(".b-listen", body).onclick = say;
   if (!a.reply) return Promise.resolve();
   convHistory[key].push({ role: "user", text: userMsg }, { role: "assistant", text: a.reply });
@@ -708,7 +721,7 @@ async function liveSend(pcm) {
     }
     live.history.push({ role: "user", text: r.transcript }, { role: "assistant", text: a.reply });
     liveCaption(r.transcript, a.reply, a.reply_fr);
-    const interrupted = await liveSpeak(a.reply, lang, a.audio_url || a.tts_url);
+    const interrupted = await liveSpeak(a.reply, lang, a.audio_url || a.tts_url, a.audio_url ? null : a.speech);
     liveLog("bot", a.reply, a.reply_fr, null, interrupted ? "interrompu" : null);
     if (!interrupted) liveListen();
   } catch (err) {
@@ -719,7 +732,7 @@ async function liveSend(pcm) {
 }
 
 // OkapiAI parle. Résout `true` si l'utilisateur l'a interrompu, `false` à la fin normale.
-function liveSpeak(text, lang, url) {
+function liveSpeak(text, lang, url, speech) {
   if (!live.on || !text) return Promise.resolve(false);
   liveSetState("speaking");
   live.echo = 0; live.bargeMs = 0;
@@ -735,19 +748,16 @@ function liveSpeak(text, lang, url) {
       resolve(Boolean(how?.interrupted));
     };
     live.stopPlayback = finish;
-    if (url) {
-      // phrase par phrase : OkapiAI commence à parler dès que la 1re phrase est prête
-      playChunks(ttsChunks(text, url), (a) => {
+    // phrase par phrase, et chaque morceau avec la voix de sa langue (mots français -> voix française)
+    const plan = speechPlan(text, lang, url, speech);
+    if (plan.length) {
+      playChunks(plan, (a) => {
         live.player = a;
+        if (!a) return $("#live-orb").classList.add("no-level");    // voix du navigateur
+        $("#live-orb").classList.remove("no-level");
         try { live.ctx.createMediaElementSource(a).connect(live.playAnalyser); }
         catch { $("#live-orb").classList.add("no-level"); }
       }, () => done).then(() => finish());
-    } else if ("speechSynthesis" in window && ["fr", "sw"].includes(lang)) {
-      $("#live-orb").classList.add("no-level");
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = lang === "fr" ? "fr-FR" : "sw-KE";
-      u.onend = u.onerror = () => finish();
-      speechSynthesis.speak(u);
     } else {
       setTimeout(() => finish(), Math.min(6000, 400 + text.length * 55));  // pas de voix : temps de lecture
     }

@@ -418,7 +418,25 @@ def test_dataset_recordings():
         db.close()
 
 
+def test_phrase_translation_and_voices():
+    """« je vais au marché en lingala » = demande de traduction (rien d'autre) ; une conversation n'en est pas une.
+    Les mots balisés <fr>…</fr> sont dits par la voix française, sans balises à l'écran."""
+    from app.services.conversation import parse_phrase_request as p
+    from app.services.tts import display_text, split_voices
+    assert p("je vais au marché en lingala") == "je vais au marché"
+    assert p("Traduis : il pleut beaucoup aujourd'hui") == "il pleut beaucoup aujourd'hui"
+    assert p("comment dire j'ai faim en tshiluba ?") == "j'ai faim"
+    assert p("ndenge nini balobaka nazali kokende na zando na lingala") == "nazali kokende na zando"
+    for chat_msg in ("dis-moi quelque chose", "je parle en lingala", "on discute en lingala ?", "Mbote"):
+        assert p(chat_msg) is None, chat_msg
+    text = "« ndako » elingi koloba <fr>maison</fr>."
+    assert display_text(text) == "« ndako » elingi koloba maison."
+    assert [s["lang"] for s in split_voices(text, "ln")] == ["ln", "fr"]
+    assert split_voices("Mbote !", "ln") == [{"lang": "ln", "text": "Mbote !"}]
+
+
 if __name__ == "__main__":
+    test_phrase_translation_and_voices()
     test_learner_hearing()
     test_free_ai_relay()
     test_full_flow()

@@ -62,6 +62,66 @@ _STRIP = re.compile(r"^(?:le mot|le terme|l'expression|la phrase|liloba|mot|neno
                     r"\s+(?:en lingala|en francais|na lingala|na lifalanse|en swahili|kwa kiswahili)$")
 
 
+# « je vais au marché en lingala », « traduis : il pleut beaucoup », « comment dire j'ai faim en tshiluba ? »
+_P = r"(?P<t>.{2,200}?)"
+_PHRASE = [re.compile(p) for p in (
+    rf"^(?:traduis|traduire|traduction|traduction de|traduis moi|traduis-moi|"
+    rf"comment dire|comment on dit|comment dit on|comment dit-on|comment est ce qu'on dit|comment est-ce qu'on dit|"
+    rf"comment je dis|comment je peux dire|comment tu dis|comment dis tu|comment dis-tu)\s*:?\s+"
+    rf"(?:la phrase\s+|que\s+)?{_P}(?:\s+(?:en|na)\s+{_NATL})?$",
+    # « dis … » seulement avec la langue : « dis-moi quelque chose » reste une conversation
+    rf"^(?:dis|dis moi|dis-moi|dites|dites moi|dites-moi)\s*:?\s+(?:la phrase\s+|que\s+)?{_P}\s+(?:en|na)\s+{_NATL}$",
+    rf"^ndenge nini\s+\w*(?:loba|lobaka)\s+{_P}\s+na\s+{_NATL}$",
+    rf"^{_P}\s+(?:en|na)\s+{_NATL}(?:\s+(?:c'est quoi|stp|svp|s'il te plait|s'il te plaît|ca donne quoi|ça donne quoi))?$",
+)]
+
+
+_TALK = re.compile(r"\b(?:parle|parles|parler|parlez|parlons|discute|discuter|discutons|ecris|écris|écrire|ecrire|"
+                   r"reponds|réponds|répondre|repondre|converse|converser|apprendre|apprends|enseigne|"
+                   r"enseigner|chante|chanter|raconte|raconter|explique|expliquer)\s*(?:moi|nous)?$")
+
+
+def parse_phrase_request(message: str) -> Optional[str]:
+    """La phrase française à traduire quand l'utilisateur demande une traduction (sinon None)."""
+    low = " ".join(re.sub(r"[?!«»\"“”]", " ", message.replace("’", "'")).lower().split()).strip(" .")
+    for p in _PHRASE:
+        m = p.match(low)
+        if m:
+            term = m.group("t").strip(" :.,'\"")
+            # « je parle en lingala », « on discute en lingala ? » : c'est une conversation, pas une traduction
+            if _TALK.search(term):
+                return None
+            if len(term.split()) >= 2:   # un seul mot : géré par « comment dit-on X »
+                return term
+    return None
+
+
+def answer_phrase(db: Session, lang: str, phrase: str) -> dict:
+    """Traduction d'une phrase, et rien d'autre : dataset validé, puis IA guidée par le dictionnaire,
+    puis modèle de traduction / mot à mot."""
+    out = {"reply": None, "reply_fr": phrase, "method": None, "audio_url": None, "word": None, "example": None}
+    t = translator.translate(db, phrase, "fr", lang)
+    if t["method"] == "dataset":
+        out.update(reply=t["translation"], method="dataset", audio_url=t.get("audio_url"))
+        return out
+    hints = []
+    if lang == "ln":  # mots du dictionnaire pour chaque mot français de la phrase
+        for w in dict.fromkeys(re.findall(r"[\wàâçéèêëîïôûùüœ'-]+", phrase.lower())):
+            w = re.sub(r"^(?:l|d|j|m|t|s|n|qu)'", "", w)
+            if len(w) > 2:
+                tr = lexicon.reverse(w)
+                if tr:
+                    hints.append({"texte": " / ".join(tr[:3]), "sens": w})
+    ai = claude_chat.translate(lang, phrase, hints)
+    if ai:
+        reply = ai["reply"].strip()
+        out.update(reply=reply[:1].upper() + reply[1:], reply_fr=phrase[:1].upper() + phrase[1:], method="ia")
+        return out
+    if t.get("translation"):
+        out.update(reply=t["translation"], method=t["method"])
+    return out
+
+
 def parse_word_question(message: str) -> Optional[tuple[str, str]]:
     """('sens', mot) pour « que veut dire X », ('traduire', mot) pour « comment dit-on X »."""
     k = " ".join(key(re.sub(r"[?!.,«»\"“”]", " ", message)).split())
@@ -79,10 +139,11 @@ def parse_word_question(message: str) -> Optional[tuple[str, str]]:
 
 # Gabarits de réponse dans la langue de la conversation (le sens reste en français)
 _SAY = {
-    "ln": {"sens": "« {w} » elingi koloba : {s}.", "traduire": "Na lingala, « {t} » ezali « {w} ».",
+    # <fr>…</fr> : ces mots sont dits par la voix française, le reste par la voix de la langue
+    "ln": {"sens": "« {w} » elingi koloba : <fr>{s}</fr>.", "traduire": "Na lingala, « <fr>{t}</fr> » ezali « {w} ».",
            "inconnu": "Nayebi naino liloba « {t} » te. Soki oyebi ndimbola na yango, lakisa ngai !",
            "ou": " to "},
-    "sw": {"sens": "« {w} » maana yake ni : {s}.", "traduire": "Kwa Kiswahili, « {t} » ni « {w} ».",
+    "sw": {"sens": "« {w} » maana yake ni : <fr>{s}</fr>.", "traduire": "Kwa Kiswahili, « <fr>{t}</fr> » ni « {w} ».",
            "inconnu": "Bado sijui neno « {t} ». Ukijua maana yake, nifundishe !", "ou": " au "},
 }
 _SAY_FR = {"sens": "« {w} »{p} signifie : {s}.", "traduire": "En {lang}, « {t} » se dit « {w} ».",
@@ -92,7 +153,8 @@ _SAY_FR = {"sens": "« {w} »{p} signifie : {s}.", "traduire": "En {lang}, « {t
 def _say(lang: str, kind: str, **kw) -> tuple[str, str]:
     fr = _SAY_FR[kind].format(lang=LANGUAGES[lang].lower(), p=kw.pop("p", ""), **kw)
     local = _SAY.get(lang, {}).get(kind)
-    return (local.format(**kw) if local else fr), fr
+    # pas de gabarit dans cette langue : la phrase est en français, donc dite par la voix française
+    return (local.format(**kw) if local else f"<fr>{fr}</fr>"), fr
 
 
 def answer_word_question(db: Session, lang: str, kind: str, term: str, history: list[dict]) -> dict:
@@ -193,6 +255,11 @@ def converse(db: Session, lang: str, message: str, history: list[dict], voice: b
     question = parse_word_question(message)
     if question:
         out.update(answer_word_question(db, lang, *question, history))
+        return out
+    # « je vais au marché en lingala » : la traduction de la phrase, sans rien ajouter
+    phrase = parse_phrase_request(message)
+    if phrase:
+        out.update(answer_phrase(db, lang, phrase))
         return out
 
     # 1. Dialogue validé

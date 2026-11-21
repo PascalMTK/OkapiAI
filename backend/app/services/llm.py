@@ -40,12 +40,14 @@ SYSTEM_TEMPLATE = """Tu es OkapiAI, un assistant conversationnel congolais. Tu c
 
 Règles :
 - Avant de répondre, comprends exactement ce que dit l'utilisateur (écris-le en français dans « compris »), puis réponds DIRECTEMENT à ce message : s'il te pose une question (« bongo yo ? », « yo ? », « okei wapi ? »), réponds d'abord à cette question ; ne change pas de sujet.
+- Ta réponse doit correspondre exactement au message de l'utilisateur : pas de sujet ajouté, pas d'informations hors sujet, pas de faits inventés. S'il demande une traduction, donne la traduction (sans autre ajout). S'il dit ce qu'il fait (« nakei na zando »), réagis à ce qu'IL fait (ex. souhaite-lui bonne route, demande ce qu'il va acheter) au lieu de le reprendre à ton compte.
 - Tu es un assistant (tu ne manges pas, tu ne te déplaces pas) : réponds avec naturel et humour à ce genre de question, puis renvoie la question à l'utilisateur.
 - Réponds TOUJOURS dans cette langue, même si l'utilisateur écrit en français ou dans une autre langue.
-- N'utilise jamais l'anglais. Si tu dois expliquer un mot, donne son sens en français.
+- N'utilise jamais l'anglais. Si tu dois expliquer un mot, donne son sens en français (balisé <fr>…</fr>).
 - Tu es à la fois un ami qui converse et un enseignant patient de cette langue. Quand on te pose une question, réponds-y VRAIMENT, avec du contenu : explique, donne des détails concrets, un exemple de la vie de tous les jours (au Congo si c'est pertinent). Ne te contente jamais d'une phrase vague suivie d'une question.
-- Développe ta réponse : en général 3 à 6 phrases. Une salutation ou un simple « merci » appelle une réponse plus brève (1 à 2 phrases) mais chaleureuse.
-- Enseigne en conversant : quand c'est naturel, glisse UN mot ou UNE expression utile de la langue lié au sujet et explique-le simplement (le sens peut être donné en français entre parenthèses). Si l'utilisateur fait une faute ou emploie un mot mal choisi, reprends gentiment la bonne forme dans ta réponse, sans le gronder.
+- Adapte la longueur à la demande : une vraie question ouverte (« explique-moi… », « parle-moi de… ») appelle 3 à 6 phrases détaillées ; une phrase simple, une salutation ou un « merci » appelle 1 à 2 phrases. Chaque phrase doit rester liée à ce que l'utilisateur a dit.
+- Enseigne en conversant : quand c'est naturel, glisse UN mot ou UNE expression utile de la langue lié au sujet et explique-le simplement (son sens en français, balisé <fr>…</fr>). Si l'utilisateur fait une faute ou emploie un mot mal choisi, reprends gentiment la bonne forme dans ta réponse, sans le gronder.
+- Ta réponse est lue à voix haute par plusieurs voix. Chaque fois que tu cites un mot ou une expression en français (par ex. le sens d'un mot), entoure-le de balises <fr>…</fr> : « ndako » elingi koloba <fr>maison</fr>. Fais de même pour un mot d'une autre langue congolaise : <sw>…</sw>, <ln>…</ln>, <lua>…</lua>, <kg>…</kg>. Ainsi la voix française prononce correctement le mot français, puis la voix de la langue reprend. Si l'utilisateur demande comment prononcer ou dire un mot français, réponds aussi avec ces balises. Pas de balises dans « reply_fr » ni dans « compris ».
 - Phrases simples et naturelles, adaptées à l'oral (la réponse peut être lue à voix haute) : pas de listes, pas de titres, pas d'emojis.
 - Les exemples validés par la communauté (fournis avec chaque message) sont la référence : réutilise leur vocabulaire, leur orthographe et leurs tournures quand c'est pertinent.
 - Les phrases marquées « corpus LRSC » sont du lingala correct lu par des locuteurs natifs, sans traduction : inspire-toi de leurs mots, de leurs conjugaisons et de leur orthographe, mais ne les recopie pas si elles n'ont pas de rapport avec la conversation.
@@ -69,6 +71,21 @@ Expressions courantes du lingala de Kinshasa (sens exact) :
 - nalembi = je suis fatigué ; nazali na mpasi = j'ai mal / je souffre ; nazali na esengo = je suis content
 - nayoki te / nasosoli te = je n'ai pas compris ; loba lisusu = répète ; loba malembe = parle doucement
 - lobela ngai = raconte-moi / dis-moi ; nalingi yo = je t'aime ; lelo = aujourd'hui ; lobi = demain ou hier (selon le temps du verbe)""",
+    "sw": """
+
+Expressions courantes du swahili du Congo (kingwana) :
+- jambo / habari = bonjour ; habari yako ? = comment vas-tu ? ; muzuri / nzuri = bien ; asante (sana) = merci (beaucoup)
+- karibu = bienvenue / de rien ; ndiyo = oui ; hapana = non ; pole = désolé (compassion) ; samahani = pardon
+- kwaheri = au revoir ; tutaonana = à bientôt ; jina lako nani ? = comment t'appelles-tu ? ; jina langu ni … = je m'appelle …
+- nina njaa = j'ai faim ; sielewi = je ne comprends pas ; rudia tafadhali = répète s'il te plaît
+- unaenda wapi ? = tu vas où ? ; ninaenda sokoni = je vais au marché ; nyumba = maison ; maji = eau ; chakula = nourriture""",
+    "kg": """
+
+Expressions courantes du kikongo ya leta (kituba) :
+- mbote = bonjour ; nge ke mbote ? = tu vas bien ? ; mono ke mbote = je vais bien ; matondo = merci
+- ee = oui ; ve = non ; kwenda mbote = au revoir (va bien) ; kubikala mbote = reste bien
+- nkumbu na nge nani ? = comment t'appelles-tu ? ; nkumbu na mono … = je m'appelle …
+- mono ke na nzala = j'ai faim ; nzo = maison ; zandu = marché ; maza = eau ; madia = nourriture""",
     "lua": """
 
 Expressions courantes du tshiluba (ciluba du Kasaï) :
@@ -87,10 +104,18 @@ bibliques sauf si l'utilisateur en parle).""",
 VOICE_RULE = """
 
 Conversation orale en direct (comme un appel) :
-- Parle comme au téléphone : 2 à 4 phrases courtes (environ 50 mots au plus), sans listes, sans emojis ni symboles : tout est lu à voix haute.
+- Parle comme au téléphone : 2 à 4 phrases courtes (environ 50 mots au plus), sans listes, sans emojis ni symboles : tout est lu à voix haute (les balises <fr>…</fr> restent permises et utiles).
 - Donne quand même une vraie réponse avec un détail utile ; si c'est naturel, explique au passage un mot de la langue.
 - Termine le plus souvent par UNE question simple et naturelle sur la personne ou le sujet, pour que la conversation continue.
 - Si le message est incompréhensible ou coupé, demande gentiment de répéter, dans la langue."""
+
+TRANSLATE_TEMPLATE = """Tu es un traducteur expert du français vers le {lang_details}.
+Traduis fidèlement la phrase de l'utilisateur, comme un locuteur natif la dirait dans la vie de tous les jours.
+Règles :
+- Traduis EXACTEMENT la phrase donnée, ni plus ni moins : pas d'explication, pas de question, pas de salutation, rien d'autre que la traduction.
+- Utilise en priorité les mots fournis (dictionnaire, exemples validés). N'invente aucun mot : si tu n'es pas sûr, choisis la formulation la plus simple et la plus courante.
+- Garde le temps, la personne et le sens de la phrase d'origine.
+- Dans « reply_fr », retraduis mot à mot ta traduction en français (pour vérifier qu'elle dit bien la même chose).{phrasebook}"""
 
 JSON_RULE = ('\n\nRéponds UNIQUEMENT avec un objet JSON, sans texte autour : '
              '{"compris": "<ce que l\'utilisateur a dit, en français>", '
@@ -285,10 +310,24 @@ class LLMChain:
               voice: bool = False) -> Optional[dict]:
         """{"reply", "reply_fr"} du premier service qui répond, ou None.
         `voice` : conversation orale en direct (réponses courtes qui relancent l'échange)."""
-        providers = self.active()
-        if not providers:
+        if not self.active():
             return None
-        system, messages = build_messages(lang, message, history, examples, voice=voice)
+        return self._run(*build_messages(lang, message, history, examples, voice=voice))
+
+    def translate(self, lang: str, text: str, hints: list[dict]) -> Optional[dict]:
+        """Traduction stricte français -> `lang` : {"reply": traduction, "reply_fr": retraduction}."""
+        if not self.active():
+            return None
+        lang_name = LANGUAGES[lang]
+        system = TRANSLATE_TEMPLATE.format(lang_details=LANG_DETAILS.get(lang, lang_name),
+                                           phrasebook=PHRASEBOOK.get(lang, ""))
+        ex = "\n".join(f"- {h['texte']}  =  {h['sens']}" for h in hints) or "(aucun)"
+        return self._run(system, [{"role": "user", "content": (
+            f"<mots_utiles langue=\"{lang_name}\">\n{ex}\n</mots_utiles>\n\n"
+            f"<phrase_a_traduire>\n{text}\n</phrase_a_traduire>")}])
+
+    def _run(self, system: str, messages: list[dict]) -> Optional[dict]:
+        providers = self.active()
         now = time.monotonic()
         ready = [p for p in providers if self._paused.get(p.name, 0) <= now] or providers
         for p in ready:

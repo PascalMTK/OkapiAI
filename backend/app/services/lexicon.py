@@ -41,6 +41,16 @@ COMMON_FR = {
     "famille": ["libota"], "femme": ["mwási"], "homme": ["mobáli"], "enfant": ["mwǎna"],
     "maison": ["ndáko"], "faim": ["nzala"], "soif": ["mposa ya mái"], "beau": ["kitɔ́kɔ"],
     "belle": ["kitɔ́kɔ"], "bien": ["malámu"], "beaucoup": ["mingi"], "petit": ["moke"],
+    # mots de tous les jours à Kinshasa (le dictionnaire donne parfois un mot plus rare en premier)
+    "marche": ["zándo", "wɛnzɛ"], "ecole": ["kelási", "eteyelo"], "eglise": ["lingomba", "ndako ya Nzambe"],
+    "voiture": ["mótuka"], "route": ["nzelá"], "rue": ["balabala"], "ville": ["engumba"], "village": ["mboka"],
+    "pays": ["mboka"], "nourriture": ["bilei"], "poisson": ["mbisi"], "viande": ["nyama"], "pain": ["mapa"],
+    "acheter": ["kosomba"], "vendre": ["koteka"], "travailler": ["kosála mosála"], "fatigue": ["bolɛmbú", "kolɛ́mba"],
+    "je suis fatigue": ["nalɛmbí"], "malade": ["mobɛ́lɛ"], "hopital": ["lopitálo"], "medecin": ["monganga"],
+    "ecrire": ["kokoma"], "lire": ["kotánga"], "apprendre": ["koyékola"], "comprendre": ["kososola"],
+    "savoir": ["koyéba"], "vouloir": ["kolinga"], "voir": ["komona"], "entendre": ["koyóka"],
+    "maintenant": ["sikóyo"], "toujours": ["ntángo nyɔ́nsɔ"], "pere": ["tatá"], "mere": ["mamá"],
+    "frere": ["ndeko ya mobáli"], "soeur": ["ndeko ya mwási"], "nom": ["nkómbo"],
 }
 
 POS_FR = {"noun": "nom", "verb": "verbe", "adj": "adjectif", "adv": "adverbe", "intj": "interjection",

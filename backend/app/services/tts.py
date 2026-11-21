@@ -29,6 +29,9 @@ log = logging.getLogger("okapiai.tts")
 VOICES = {
     "ln": os.getenv("OKAPI_TTS_LN", "khof312/mms-tts-lin"),
     "sw": os.getenv("OKAPI_TTS_SW", "facebook/mms-tts-swh"),
+    # voix française : prononce les mots français cités dans une réponse, puis rend la main
+    # à la voix de la langue nationale (voir split_voices)
+    "fr": os.getenv("OKAPI_TTS_FR", "facebook/mms-tts-fra"),
 }
 if os.getenv("OKAPI_TTS_LUA", "") != "off":
     VOICES["lua"] = os.getenv("OKAPI_TTS_LUA") or VOICES["ln"]   # voix provisoire : la voix lingala
@@ -54,6 +57,54 @@ def speakable(text: str) -> str:
     t = "".join(c for c in unicodedata.normalize("NFD", t) if unicodedata.category(c) != "Mn")
     t = re.sub(r"[«»\"“”()\[\]*_#]", " ", t)
     return " ".join(t.split())
+
+
+def speakable_fr(text: str) -> str:
+    """La voix française connaît les accents (é, è, ç, œ…) : on les garde, en minuscules."""
+    t = text.lower().replace("’", "'")
+    t = re.sub(r"[«»\"“”()\[\]*_#]", " ", t)
+    return " ".join(t.split())
+
+
+# Une réponse peut citer des mots d'une autre langue : l'IA les balise (<fr>maison</fr>) et chaque
+# morceau est dit par la voix de sa langue (voix française pour le français, puis relais à la voix
+# lingala / tshiluba…). Les balises n'apparaissent jamais à l'écran.
+_TAG = re.compile(r"<(fr|ln|sw|kg|lua)>(.*?)</\1>", re.S | re.I)
+_ANY_TAG = re.compile(r"</?(?:fr|ln|sw|kg|lua)>", re.I)
+
+
+def display_text(text: Optional[str]) -> Optional[str]:
+    """Texte affiché : balises retirées (le mot cité garde ses guillemets s'il en avait)."""
+    if not text:
+        return text
+    t = _TAG.sub(lambda m: m.group(2), text)
+    return re.sub(r"[ \t]{2,}", " ", _ANY_TAG.sub("", t)).strip()
+
+
+def split_voices(text: Optional[str], lang: str) -> list[dict]:
+    """[{"lang", "text"}…] dans l'ordre : morceaux balisés dans leur langue, le reste dans `lang`."""
+    out: list[dict] = []
+
+    def add(code: str, chunk: str):
+        chunk = _ANY_TAG.sub("", chunk)
+        if not re.search(r"\w", chunk):
+            if out:  # ponctuation seule : collée au morceau précédent
+                out[-1]["text"] += chunk.rstrip()
+            return
+        if out and out[-1]["lang"] == code:
+            out[-1]["text"] += " " + chunk.strip()
+        else:
+            out.append({"lang": code, "text": chunk.strip()})
+
+    pos = 0
+    for m in _TAG.finditer(text or ""):
+        add(lang, text[pos:m.start()])
+        add(m.group(1).lower(), m.group(2))
+        pos = m.end()
+    add(lang, (text or "")[pos:])
+    for seg in out:  # guillemets et parenthèses orphelins en bord de morceau
+        seg["text"] = seg["text"].strip(" «»\"“”()")
+    return [s for s in out if re.search(r"\w", s["text"])]
 
 
 def sentences(text: str) -> list[str]:
@@ -179,7 +230,7 @@ class Synthesizer:
                 import torch
                 rate = model.config.sampling_rate
                 pieces = []
-                for sentence in sentences(speakable(text)):
+                for sentence in sentences(speakable_fr(text) if lang == "fr" else speakable(text)):
                     inputs = tok(sentence, return_tensors="pt").to(model.device)
                     if inputs["input_ids"].shape[-1] <= 1:
                         continue

@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from train_voice import base_files, clean_text, lang_of, out_dir  # noqa: E402
 
 MAX_CHARS = 600
+NOISE, NOISE_DP = 0.4, 0.3   # modifiables : --noise / --noise-dp
 
 # Les voix n'ont appris que des lettres : un chiffre (« 2 bato », « 2026 ») faisait échouer la phrase
 # entière, et OkapiAI se rabattait sur la voix de secours, bien plus lente. On les dit en toutes lettres.
@@ -101,6 +102,11 @@ class Voice:
             from TTS.utils.synthesizer import Synthesizer
             self.synth = Synthesizer(tts_checkpoint=str(best), tts_config_path=str(cfg),
                                      use_cuda=torch.cuda.is_available())
+            # Moins de hasard à la lecture : par défaut (0,667 / 1,0) la voix tire au sort une partie du
+            # rythme et du timbre, d'où des hésitations et des mots avalés. Mesuré (MMS relit la voix) :
+            # Florent 12 % -> 5,7 % de lettres mal lues avec 0,4 / 0,3.
+            m = self.synth.tts_model
+            m.inference_noise_scale, m.inference_noise_scale_dp = NOISE, NOISE_DP
             self.model_path, self.mtime = best, mtime
             print(f"Voix {self.speaker} chargée : {best}", flush=True)
 
@@ -157,7 +163,10 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--speaker", default="florent")
     ap.add_argument("--port", type=int, default=8100)
+    ap.add_argument("--noise", type=float, default=NOISE, help="hasard du timbre (défaut du modèle : 0.667)")
+    ap.add_argument("--noise-dp", type=float, default=NOISE_DP, help="hasard du rythme (défaut du modèle : 1.0)")
     a = ap.parse_args()
+    NOISE, NOISE_DP = a.noise, a.noise_dp
     voice = Voice(a.speaker)
     server = ThreadingHTTPServer(("127.0.0.1", a.port), make_handler(voice))
     print(f"Serveur de voix ({a.speaker}) sur http://127.0.0.1:{a.port}", flush=True)
