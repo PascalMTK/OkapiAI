@@ -24,6 +24,7 @@ from ..similarity import normalize, similarity
 from . import translator
 from .basics import basic_reply
 from .corpus import corpus, corpus_lua
+from .vocab_lua import vocab_lua
 from .lexicon import key, lexicon
 from .llm import claude_chat
 
@@ -104,7 +105,7 @@ def answer_phrase(db: Session, lang: str, phrase: str) -> dict:
     if t["method"] == "dataset":
         out.update(reply=t["translation"], method="dataset", audio_url=t.get("audio_url"))
         return out
-    hints = []
+    hints = vocab_lua.examples_for(phrase) if lang == "lua" else []
     if lang == "ln":  # mots du dictionnaire pour chaque mot français de la phrase
         for w in dict.fromkeys(re.findall(r"[\wàâçéèêëîïôûùüœ'-]+", phrase.lower())):
             w = re.sub(r"^(?:l|d|j|m|t|s|n|qu)'", "", w)
@@ -192,7 +193,8 @@ def answer_word_question(db: Session, lang: str, kind: str, term: str, history: 
     else:
         # « comment dit-on X ? » : traduction validée, puis dictionnaire inversé
         t = translator.translate(db, term, "fr", lang)
-        words = [t["translation"]] if t["method"] == "dataset" else (lexicon.reverse(term) if lang == "ln" else [])
+        words = [t["translation"]] if t["method"] == "dataset" else (
+            lexicon.reverse(term) if lang == "ln" else vocab_lua.reverse(term) if lang == "lua" else [])
         if words:
             reply, _ = _say(lang, "traduire", t=term, w=f" »{ou}« ".join(words[:2]))
             fr = _SAY_FR["traduire"].format(lang=LANGUAGES[lang].lower(), t=term, w=" » ou « ".join(words[:2]))
@@ -205,7 +207,8 @@ def answer_word_question(db: Session, lang: str, kind: str, term: str, history: 
             return answer_word_question(db, lang, "sens", term, history)
     # 3. IA (si configurée), sinon : « je ne connais pas encore ce mot »
     question = f"Que veut dire « {term} » ?" if kind == "sens" else f"Comment dit-on « {term} » en {LANGUAGES[lang]} ?"
-    hints = lexicon.examples_for(term) + corpus.examples_for_ai(term, k=4) if lang == "ln" else []
+    hints = (lexicon.examples_for(term) + corpus.examples_for_ai(term, k=4) if lang == "ln"
+             else vocab_lua.examples_for(term) + corpus_lua.examples_for_ai(term, k=4) if lang == "lua" else [])
     ai = claude_chat.reply(lang, question, history, hints)
     if ai:
         out.update(reply=ai["reply"], reply_fr=ai["reply_fr"], method="ia")
@@ -291,7 +294,7 @@ def converse(db: Session, lang: str, message: str, history: list[dict], voice: b
     if lang == "ln":
         examples += lexicon.examples_for(message) + corpus.examples_for_ai(message)
     elif lang == "lua":
-        examples += corpus_lua.examples_for_ai(message, k=4)
+        examples += vocab_lua.examples_for(message) + corpus_lua.examples_for_ai(message, k=4)
     ai = claude_chat.reply(lang, message, history, examples, voice=voice)
     if ai:
         out.update(reply=ai["reply"], reply_fr=ai["reply_fr"], method="ia")

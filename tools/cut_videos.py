@@ -46,7 +46,7 @@ def download(vid: str) -> Path:
     if (out / "audio.wav").exists() and list(out.glob("*.json3")):
         return out
     cmd = [
-        sys.executable, "-m", "yt_dlp",
+        sys.executable, "-m", "yt_dlp", "--js-runtimes", "node",
         "--ffmpeg-location", imageio_ffmpeg.get_ffmpeg_exe(),
         "-f", "bestaudio", "-x", "--audio-format", "wav",
         "--postprocessor-args", "ffmpeg:-ar 16000 -ac 1",

@@ -50,6 +50,7 @@ def _known_lingala(lang: str, text: str) -> bool:
         return bool(words) and known / len(words) >= 0.5
     except Exception:
         return False
+_LN_ADAPTER = _LOCAL_MMS.parent / "mms-lin-affine" / "adapter.lin.safetensors"
 MMS_LANGS = {"ln": "lin", "sw": "swh", "fr": "fra"}
 WHISPER_LANGS = {"fr": "fr", "sw": "sw", "ln": "ln"}
 WHISPER_SIZE = os.getenv("OKAPI_WHISPER_MODEL", "small")
@@ -107,7 +108,7 @@ class MMSRecognizer:
             model = Wav2Vec2ForCTC.from_pretrained(MMS_MODEL, target_lang="lin", ignore_mismatched_sizes=True)
             dtype = torch.float16 if self._device == "cuda" else torch.float32
             self._model = model.to(self._device, dtype).eval()
-            self._adapter = "lin"
+            self._adapter = None   # _use("lin") chargera aussi l'adaptateur affiné s'il existe
             log.info("MMS chargé (%s) sur %s", MMS_MODEL, self._device)
         except Exception as exc:
             log.warning("Reconnaissance vocale MMS indisponible : %s", exc)
@@ -129,6 +130,12 @@ class MMSRecognizer:
         if self._adapter != code:
             self._proc.tokenizer.set_target_lang(code)
             self._model.load_adapter(code)
+            if code == "lin" and _LN_ADAPTER.is_file() and os.getenv("OKAPI_ASR_LN_ADAPTER", "on") != "off":
+                # adaptateur lingala affiné sur LRSC (tools/train_asr.py train)
+                from safetensors.torch import load_file
+                state = load_file(str(_LN_ADAPTER))
+                self._model.load_state_dict({k: v.to(self._device, self._model.dtype) for k, v in state.items()},
+                                            strict=False)
             self._adapter = code
 
     def _run(self, audio, code: str) -> tuple[str, float]:

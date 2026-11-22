@@ -30,3 +30,6 @@ comparaison-voix/
 dataset/sources/tshiluba/corpus_brut.txt
 dataset/sources/tshiluba/audio/
 dataset/sources/tshiluba/audio.jsonl
+
+# glossaire tshiluba du blog « Des mots et des langues » : pas de licence, usage personnel (tools/import_eklablog_lua.py le recrée)
+dataset/sources/tshiluba/vocab_fr.jsonl
