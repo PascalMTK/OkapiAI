@@ -31,14 +31,9 @@
 <body>
 <header>
   <h1>Okapi · Révision</h1>
+  <select id="langue"><option value="ln">Lingala</option><option value="lua">Tshiluba</option></select>
   <select id="video"></select>
-  <select id="filter">
-    <option value="ln,mixte">Lingala + mixte</option>
-    <option value="ln">Lingala seulement</option>
-    <option value="mixte">Mixte</option>
-    <option value="fr">Français</option>
-    <option value="all">Tout</option>
-  </select>
+  <select id="filter"></select>
   <label style="margin:0"><input type="checkbox" id="todo" checked> à revoir seulement</label>
   <span id="stats"></span>
 </header>
@@ -46,17 +41,34 @@
 <p class="keys" style="text-align:center">Entrée = enregistrer · Ctrl+Espace = rejouer le clip en cours</p>
 <script>
 const $ = s => document.querySelector(s);
-let rows = [], current = null;
+let rows = [], current = null, videos = [];
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const FILTERS = {
+  ln: [["ln,mixte", "Lingala + mixte"], ["ln", "Lingala seulement"], ["mixte", "Mixte"], ["fr", "Français"], ["all", "Tout"]],
+  lua: [["all", "Tout"], ["lua", "Tshiluba"], ["mixte", "Mixte"], ["fr", "Français"]],
+};
+const LANGS = { ln: ["fr", "ln", "mixte"], lua: ["lua", "mixte", "fr"] };
+const isLua = () => $("#langue").value === "lua";
+const store = (k, v) => { try { v === undefined ? (v = localStorage.getItem(k)) : localStorage.setItem(k, v); } catch { v = null; } return v; };
 
 async function loadVideos() {
-  const v = await (await fetch("/api/videos")).json();
-  $("#video").innerHTML = v.map(x => `<option value="${x.id}">${esc(x.title)}</option>`).join("");
-  try { const last = localStorage.getItem("okapi-video"); if (last && v.some(x => x.id === last)) $("#video").value = last; } catch {}
-  loadClips();
+  videos = await (await fetch("/api/videos")).json();
+  const last = store("okapi-langue");
+  if (last) $("#langue").value = last;
+  fillVideos();
+}
+function fillVideos() {
+  const l = $("#langue").value;
+  store("okapi-langue", l);
+  const v = videos.filter(x => x.langue === l);
+  $("#video").innerHTML = v.map(x => `<option value="${x.id}">${esc(x.title)} (${x.done}/${x.total})</option>`).join("");
+  $("#filter").innerHTML = FILTERS[l].map(([k, t]) => `<option value="${k}">${t}</option>`).join("");
+  const last = store("okapi-video");
+  if (last && v.some(x => x.id === last)) $("#video").value = last;
+  if (v.length) loadClips(); else { rows = []; render(); }
 }
 async function loadClips() {
-  try { localStorage.setItem("okapi-video", $("#video").value); } catch {}
+  store("okapi-video", $("#video").value);
   rows = await (await fetch("/api/clips?id=" + $("#video").value)).json();
   render();
 }
@@ -65,6 +77,7 @@ function render() {
   const shown = rows.filter(r => (f === "all" || f.split(",").includes(r.lang || "fr")) && (!todo || r.needs_review));
   const done = rows.filter(r => !r.needs_review).length;
   $("#stats").textContent = `${shown.length} affichés · ${done}/${rows.length} validés`;
+  if (isLua()) return renderLua(shown);
   $("#list").innerHTML = shown.slice(0, 150).map((r, i) => {
     const words = (r.words || []).map(w => w.lang === "ln" ? `<span class="w-ln">${esc(w.w)}</span>` : esc(w.w)).join(" ") || esc(r.asr_fr);
     const mms = (r.ln_mms || []).map(s => `<div class="hint">MMS : <b>${esc(s.mms)}</b>${s.lexique?.length ? " → lexique : " + s.lexique.map(l => `<b>${esc(l.lingala)}</b> = ${esc(l.francais)}`).join(", ") : ""}</div>`).join("");
@@ -88,10 +101,37 @@ function render() {
     el.querySelectorAll("input[type=text]").forEach(inp => inp.addEventListener("keydown", e => { if (e.key === "Enter") save(el, false); }));
   });
 }
+// Tshiluba : le champ est pré-rempli avec la transcription automatique ; on corrige ce qui est dit, mot pour mot.
+function renderLua(shown) {
+  $("#list").innerHTML = shown.slice(0, 150).map(r => `<div class="clip ${r.needs_review ? "" : "done"}" data-i="${rows.indexOf(r)}">
+      <div class="row"><audio controls preload="none" src="/${esc(r.audio)}"></audio>
+        <span class="tag">${r.start.toFixed(1)}s</span>
+        <select class="lang">${LANGS.lua.map(l => `<option>${l}</option>`).join("")}</select></div>
+      <div class="hint">Automatique : <b>${esc(r.asr_lua || "—")}</b></div>
+      <label>Texte exact entendu (tshiluba ; pour un clip mixte, tout ce qui est dit, français compris)</label>
+      <input type="text" class="txt" value="${esc(r.tshiluba || r.asr_lua)}">
+      <label>Traduction française (facultatif)</label><input type="text" class="fr" value="${esc(r.francais)}">
+      <div class="row" style="margin-top:8px"><button class="primary save">Valider</button>
+        <button class="onlyfr">Français seulement</button><button class="skip">Ignorer (inutilisable)</button></div>
+    </div>`).join("");
+  document.querySelectorAll(".clip").forEach(el => {
+    const r = rows[el.dataset.i];
+    el.querySelector(".lang").value = LANGS.lua.includes(r.lang) ? r.lang : "lua";
+    el.addEventListener("focusin", () => current = el);
+    el.querySelector(".save").onclick = () => save(el, false);
+    el.querySelector(".skip").onclick = () => save(el, true);
+    el.querySelector(".onlyfr").onclick = () => { el.querySelector(".lang").value = "fr"; save(el, false); };
+    el.querySelectorAll("input[type=text]").forEach(inp => inp.addEventListener("keydown", e => { if (e.key === "Enter") save(el, false); }));
+  });
+}
 async function save(el, skip) {
   const r = rows[el.dataset.i];
-  const body = { video_id: r.video_id, audio: r.audio, lang: skip ? "rejet" : el.querySelector(".lang").value,
-    lingala: el.querySelector(".ln").value.trim(), francais: el.querySelector(".fr").value.trim(), needs_review: false };
+  const lang = skip ? "rejet" : el.querySelector(".lang").value;
+  const body = isLua()
+    ? { video_id: r.video_id, audio: r.audio, lang, needs_review: false, francais: el.querySelector(".fr").value.trim(),
+        tshiluba: lang === "fr" || skip ? "" : el.querySelector(".txt").value.trim() }
+    : { video_id: r.video_id, audio: r.audio, lang, needs_review: false,
+        lingala: el.querySelector(".ln").value.trim(), francais: el.querySelector(".fr").value.trim() };
   const res = await fetch("/api/save", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body) });
   if (!res.ok) { alert("Erreur d'enregistrement"); return; }
   Object.assign(r, body);
@@ -104,7 +144,7 @@ async function save(el, skip) {
 document.addEventListener("keydown", e => {
   if (e.ctrlKey && e.code === "Space" && current) { e.preventDefault(); const a = current.querySelector("audio"); a.currentTime = 0; a.play(); }
 });
-$("#video").onchange = loadClips; $("#filter").onchange = render; $("#todo").onchange = render;
+$("#langue").onchange = fillVideos; $("#video").onchange = loadClips; $("#filter").onchange = render; $("#todo").onchange = render;
 loadVideos();
 </script>
 </body>

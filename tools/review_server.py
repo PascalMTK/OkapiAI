@@ -1,11 +1,14 @@
 """Local review page: listen to each clip and fix the Lingala / French text.
 
-Usage: python tools/review_server.py   then open http://localhost:8765
+Usage: python tools/review_server.py [--port 8766]   then open http://localhost:8766
 
-Saves straight into dataset/clips/<id>/metadata.jsonl (fields lingala, francais,
-lang, needs_review). Only listens on localhost.
+Saves straight into dataset/clips/<id>/metadata.jsonl (fields lingala / tshiluba, francais,
+lang, needs_review). Only listens on localhost. Tshiluba videos (tools/cut_lua_videos.py) have
+lang "lua" and a pre-transcription in asr_lua.
 """
+import argparse
 import json
+import re
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -16,7 +19,7 @@ DATASET = ROOT / "dataset"
 CLIPS = DATASET / "clips"
 PAGE = Path(__file__).with_name("review.html")
 LOCK = threading.Lock()
-EDITABLE = {"lingala", "francais", "lang", "needs_review"}
+EDITABLE = {"lingala", "tshiluba", "francais", "lang", "needs_review"}
 
 
 def meta_path(vid):
@@ -34,8 +37,15 @@ def titles():
     out = []
     for d in sorted(p for p in CLIPS.iterdir() if p.is_dir()):
         t = DATASET / "raw" / d.name / "title.txt"
-        out.append({"id": d.name, "title": t.read_text(encoding="utf-8").strip() if t.exists() else d.name})
-    return out
+        try:
+            rows = read_rows(d.name)
+        except (OSError, ValueError):
+            continue
+        langue = "lua" if rows and "asr_lua" in rows[0] else "ln"
+        out.append({"id": d.name, "title": t.read_text(encoding="utf-8").strip() if t.exists() else d.name,
+                    "langue": langue, "total": len(rows), "done": sum(not r.get("needs_review") for r in rows)})
+    # « LECON 2 » avant « LECON 10 »
+    return sorted(out, key=lambda x: [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", x["title"])])
 
 
 class H(BaseHTTPRequestHandler):
@@ -86,5 +96,8 @@ class H(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    print("Revision: http://localhost:8765")
-    ThreadingHTTPServer(("127.0.0.1", 8765), H).serve_forever()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--port", type=int, default=8766)
+    port = ap.parse_args().port
+    print(f"Revision: http://localhost:{port}")
+    ThreadingHTTPServer(("127.0.0.1", port), H).serve_forever()
