@@ -29,7 +29,7 @@
   <!-- Composants : un seul style de carte, de bouton et de champ pour tout le site -->
   <style type="text/tailwindcss">
     @layer components {
-      .glass-panel { @apply bg-white/[0.82] dark:bg-ink-900/[0.76] border border-slate-200/80 dark:border-white/[0.07] shadow-[0_1px_2px_rgba(15,23,42,.04),0_8px_24px_-12px_rgba(15,23,42,.12)] dark:shadow-[0_8px_30px_-12px_rgba(0,0,0,.6)] backdrop-blur-sm; }
+      .glass-panel { @apply bg-white/[0.82] dark:bg-ink-900/[0.76] border border-slate-200/80 dark:border-white/[0.07] shadow-[0_1px_2px_rgba(15,23,42,.04),0_8px_24px_-12px_rgba(15,23,42,.12)] dark:shadow-[0_8px_30px_-12px_rgba(0,0,0,.6)]; }
       .card-title { @apply font-display font-bold text-slate-900 dark:text-white tracking-tight; }
       .eyebrow { @apply text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400; }
       .field { @apply w-full bg-slate-50 dark:bg-ink-950/70 border border-slate-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 transition focus:outline-none focus:border-okapi-blue focus:ring-4 focus:ring-okapi-blue/10 focus:bg-white dark:focus:bg-ink-950; }
@@ -85,7 +85,9 @@
       -webkit-mask-image: radial-gradient(ellipse 60% 65% at 50% 50%, rgba(0,0,0,.5) 30%, #000 80%);
               mask-image: radial-gradient(ellipse 60% 65% at 50% 50%, rgba(0,0,0,.5) 30%, #000 80%); }
     .heritage-mask { position: absolute; opacity: calc(var(--mask-opacity) * var(--k, 1)); transform: rotate(var(--r, 0deg)); }
-    .heritage-mask svg { width: 100%; height: 100%; filter: url(#graffiti); overflow: visible; }
+    .heritage-mask svg { width: 100%; height: 100%; overflow: visible; }
+    #heritage-masks { position: absolute; inset: 0; filter: url(#graffiti); }
+    .heritage-layer { contain: strict; will-change: transform; transform: translateZ(0); }
 
     .brand-mark { filter: drop-shadow(0 3px 8px rgba(0, 82, 180, .22)); transition: transform .3s ease; }
     .brand-mark:hover { transform: scale(1.05) rotate(-2deg); }
@@ -155,8 +157,8 @@
   <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
 
   <!-- EN-TÊTE -->
-  <header class="sticky top-0 z-40 bg-white/85 dark:bg-ink-950/85 backdrop-blur-xl border-b border-slate-200/70 dark:border-white/[0.06]">
-    <div class="max-w-[88rem] mx-auto px-4 sm:px-6 h-16 sm:h-[4.5rem] flex items-center justify-between gap-4">
+  <header class="sticky top-0 z-40 bg-white/95 dark:bg-ink-950/95 border-b border-slate-200/70 dark:border-white/[0.06]">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 sm:h-[4.5rem] flex items-center justify-between gap-4">
       <a href="/" class="flex items-center gap-3 min-w-0" aria-label="OkapiAI — accueil">
         <img src="/assets/logo-mark.png" alt="" class="brand-mark w-11 h-11 sm:w-12 sm:h-12 object-contain flex-shrink-0">
         <div class="min-w-0">
@@ -177,7 +179,7 @@
     </div>
 
     <div class="border-t border-slate-200/60 dark:border-white/[0.05]">
-      <nav class="max-w-[88rem] mx-auto px-3 sm:px-6 flex items-center md:justify-center gap-1 overflow-x-auto no-scrollbar py-2" aria-label="Navigation principale">
+      <nav class="max-w-7xl mx-auto px-3 sm:px-6 flex items-center md:justify-center gap-1 overflow-x-auto no-scrollbar py-2" aria-label="Navigation principale">
         <button data-tab="chat" class="nav-btn active"><i data-lucide="message-square" class="w-4 h-4"></i><span>Chat & Traduction</span></button>
         <button data-tab="voice" class="nav-btn"><i data-lucide="mic" class="w-4 h-4"></i><span>Voix Live</span></button>
         <button data-tab="contribute" class="nav-btn"><i data-lucide="hand-heart" class="w-4 h-4"></i><span>Contribuer</span></button>
@@ -187,11 +189,11 @@
     </div>
   </header>
 
-  <main class="relative z-10 flex-1 max-w-[88rem] w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
+  <main class="relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
 
     <!-- ============ CHAT / TRADUCTION ============ -->
     <section id="tab-chat" class="tab-section">
-      <div class="glass-panel rounded-3xl overflow-hidden flex flex-col max-w-6xl mx-auto h-[calc(100vh-10rem)] min-h-[640px]">
+      <div class="glass-panel rounded-3xl overflow-hidden flex flex-col max-w-5xl mx-auto h-[calc(100vh-13rem)] min-h-[560px]">
         <!-- Barre d'outils -->
         <div class="px-4 sm:px-5 py-3 border-b border-slate-200/70 dark:border-white/[0.06] flex flex-col items-center gap-3">
           <div class="seg" data-modes="chat">
@@ -465,8 +467,8 @@
     </section>
   </main>
 
-  <footer class="relative z-10 border-t border-slate-200/70 dark:border-white/[0.06] py-6 mt-10 bg-white/60 dark:bg-ink-950/60 backdrop-blur">
-    <div class="max-w-[88rem] mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+  <footer class="relative z-10 border-t border-slate-200/70 dark:border-white/[0.06] py-6 mt-10 bg-white/80 dark:bg-ink-950/80">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
       <div class="flex items-center gap-2.5">
         <span class="font-display font-black text-okapi-deep dark:text-okapi-cyan tracking-wide">OKAPI AI</span>
         <span class="w-6 h-1 rounded-full drc-swoosh inline-block"></span>
