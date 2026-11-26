@@ -223,7 +223,7 @@ function appendUser(log, html, meta = "") {
   clearPlaceholder(log);
   const w = document.createElement("div");
   w.className = "flex items-start gap-3.5 justify-end";
-  w.innerHTML = `<div class="bg-gradient-to-br from-okapi-blue to-blue-700 text-white font-medium rounded-2xl rounded-tr-sm px-4 py-3 text-sm shadow-md max-w-md">
+  w.innerHTML = `<div class="bg-gradient-to-br from-okapi-blue to-blue-700 text-white font-medium rounded-2xl rounded-tr-sm px-4 py-3 text-[15px] shadow-md max-w-xl">
       <div class="u-body">${html}</div>
       ${meta ? `<span class="u-meta block text-[10px] text-okapi-yellow mt-1 font-bold">${esc(meta)}</span>` : ""}
     </div>`;
@@ -235,9 +235,9 @@ function appendUser(log, html, meta = "") {
 function appendBot(log, html, meta = "") {
   clearPlaceholder(log);
   const w = document.createElement("div");
-  w.className = "flex items-start gap-3.5 max-w-2xl";
+  w.className = "flex items-start gap-3.5 max-w-3xl";
   w.innerHTML = `<div class="w-9 h-9 rounded-xl bg-gradient-to-br from-okapi-blue to-blue-800 flex items-center justify-center text-okapi-yellow font-display font-bold text-xs flex-shrink-0 shadow-sm">AI</div>
-    <div class="b-body min-w-0 bg-white dark:bg-ink-800/90 border border-slate-200 dark:border-okapi-blue/20 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-slate-800 dark:text-slate-100 leading-relaxed shadow-sm">
+    <div class="b-body min-w-0 bg-white dark:bg-ink-800/90 border border-slate-200 dark:border-okapi-blue/20 rounded-2xl rounded-tl-sm px-4 py-3 text-[15px] text-slate-800 dark:text-slate-100 leading-relaxed shadow-sm">
       ${meta ? `<span class="inline-block text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-okapi-cyan mb-1">${esc(meta)}</span>` : ""}
       ${html}
     </div>`;
