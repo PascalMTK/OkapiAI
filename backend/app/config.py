@@ -41,8 +41,8 @@ ADMIN_PASSWORD = os.getenv("OKAPI_ADMIN_PASSWORD", "admin123")
 
 # --- Règles de validation du dataset ---
 # Nombre minimum de contributions similaires (de personnes DIFFÉRENTES)
-# avant qu'une proposition soit envoyée à l'admin.
-MIN_SIMILAR = int(os.getenv("OKAPI_MIN_SIMILAR", "10"))
+# avant qu'une proposition soit envoyée à l'admin (qui peut aussi trancher plus tôt).
+MIN_SIMILAR = int(os.getenv("OKAPI_MIN_SIMILAR", "3"))
 # Seuil de similarité textuelle (0..1) pour considérer deux contributions comme "similaires".
 SIMILARITY_THRESHOLD = float(os.getenv("OKAPI_SIMILARITY_THRESHOLD", "0.85"))
 # Seuil pour qu'une recherche de traduction dans le dataset soit acceptée.

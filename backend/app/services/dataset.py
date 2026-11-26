@@ -7,6 +7,7 @@ Flux d'une contribution :
   3. Quand une proposition réunit MIN_SIMILAR contributeurs DIFFÉRENTS,
      elle passe au statut `en_attente_admin`.
   4. L'admin approuve -> une ligne est créée dans `dataset_entrainement`.
+     Il peut aussi approuver une proposition encore en collecte (validation anticipée).
      (ou rejette -> la proposition est bloquée).
 """
 from collections import Counter
@@ -135,9 +136,8 @@ def canonical_variant(prop: Proposition) -> tuple[str, str]:
 def approve(db: Session, prop: Proposition, admin: User, *,
             source_text: Optional[str] = None, target_text: Optional[str] = None,
             note: Optional[str] = None) -> TrainingEntry:
-    if prop.status != EN_ATTENTE:
-        raise ValueError(f"Seules les propositions '{EN_ATTENTE}' peuvent être approuvées "
-                         f"(minimum {MIN_SIMILAR} contributions similaires).")
+    if prop.status not in (EN_ATTENTE, COLLECTE):
+        raise ValueError("Cette proposition a déjà été traitée")
     src, tgt = canonical_variant(prop)
     src = (source_text or src).strip()
     tgt = (target_text or tgt).strip()

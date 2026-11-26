@@ -3,190 +3,112 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OkapiAI — Intelligence Artificielle des Langues Congolaises</title>
-  <meta name="theme-color" content="#f4f8ff">
-  
-  <!-- Google Fonts: Inter & Montserrat -->
+  <title>OkapiAI — L'IA des langues congolaises</title>
+  <meta name="theme-color" content="#f6f7fb">
   <link rel="icon" type="image/png" href="/assets/logo-mark.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
-  
-  <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
-  
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.tailwindcss.com/3.4.16"></script>
   <script>
     tailwind.config = {
       darkMode: 'class',
       theme: {
         extend: {
-          fontFamily: {
-            sans: ['Inter', 'sans-serif'],
-            display: ['Montserrat', 'sans-serif'],
-          },
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'], display: ['Montserrat', 'sans-serif'] },
           colors: {
-            obsidian: {
-              950: '#02040a',
-              900: '#060c1a',
-              850: '#0a1429',
-              800: '#0f1e3d',
-            },
-            okapi: {
-              blue: '#007fff',
-              cyan: '#00a8e8',
-              yellow: '#f7d117',
-              red: '#ce1021',
-              emerald: '#10b981'
-            }
+            ink: { 950: '#050a16', 900: '#0a1224', 850: '#0f1a31', 800: '#16223d', 700: '#22304f' },
+            okapi: { blue: '#007fff', deep: '#0057c2', cyan: '#38bdf8', yellow: '#f7d117', red: '#ce1021', emerald: '#10b981' },
           },
-          animation: {
-            'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-            'ripple': 'ripple 1.5s infinite ease-out',
-          },
-          keyframes: {
-            ripple: {
-              '0%': { transform: 'scale(0.95)', opacity: '0.8' },
-              '100%': { transform: 'scale(1.6)', opacity: '0' },
-            }
-          }
-        }
-      }
+        },
+      },
     }
   </script>
 
-  <style>
+  <!-- Composants : un seul style de carte, de bouton et de champ pour tout le site -->
+  <style type="text/tailwindcss">
+    @layer components {
+      .glass-panel { @apply bg-white/95 dark:bg-ink-900/90 border border-slate-200/80 dark:border-white/[0.07] shadow-[0_1px_2px_rgba(15,23,42,.04),0_8px_24px_-12px_rgba(15,23,42,.12)] dark:shadow-[0_8px_30px_-12px_rgba(0,0,0,.6)] backdrop-blur-sm; }
+      .card-title { @apply font-display font-bold text-slate-900 dark:text-white tracking-tight; }
+      .eyebrow { @apply text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400; }
+      .field { @apply w-full bg-slate-50 dark:bg-ink-950/70 border border-slate-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 transition focus:outline-none focus:border-okapi-blue focus:ring-4 focus:ring-okapi-blue/10 focus:bg-white dark:focus:bg-ink-950; }
+      .select { @apply appearance-none bg-white dark:bg-ink-950/70 border border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 text-slate-800 dark:text-slate-100 text-sm font-semibold rounded-xl pl-3.5 pr-9 py-2.5 focus:outline-none focus:border-okapi-blue focus:ring-4 focus:ring-okapi-blue/10 transition cursor-pointer; }
+      .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl text-sm font-semibold transition active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed; }
+      .btn-primary { @apply btn px-4 py-2.5 bg-okapi-blue hover:bg-okapi-deep text-white shadow-sm shadow-okapi-blue/30; }
+      .btn-ghost { @apply btn px-4 py-2.5 bg-white hover:bg-slate-50 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-white/10; }
+      .seg { @apply inline-flex p-1 rounded-xl bg-slate-100 dark:bg-ink-950/80 border border-slate-200/70 dark:border-white/[0.06]; }
+      .mode-btn { @apply flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer; }
+      .mode-btn.active { @apply bg-white dark:bg-ink-800 text-okapi-deep dark:text-white shadow-sm; }
+      .nav-btn { @apply relative flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold whitespace-nowrap text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-white/5 transition cursor-pointer; }
+      .nav-btn.active { @apply text-okapi-deep dark:text-white bg-okapi-blue/10 dark:bg-okapi-blue/20; }
+      .chip { @apply text-xs px-3 py-1.5 rounded-full bg-white hover:bg-okapi-blue/5 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-white/10 whitespace-nowrap transition cursor-pointer; }
+      .pill { @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold whitespace-nowrap; }
+    }
+  </style>
 
+  <style>
     /* ---------- Voix live : orbe animé ---------- */
     .live-orb { --lvl: 0; transform: scale(calc(1 + var(--lvl) * 0.28));
       background: radial-gradient(circle at 35% 30%, #93c5fd, #1e7bff 45%, #0a3fb8 82%);
-      box-shadow: 0 0 calc(30px + var(--lvl) * 90px) rgba(30, 123, 255, .55), inset 0 -12px 30px rgba(0,0,0,.25);
+      box-shadow: 0 0 calc(30px + var(--lvl) * 90px) rgba(30, 123, 255, .45), inset 0 -12px 30px rgba(0,0,0,.25);
       transition: transform .09s linear, box-shadow .09s linear, filter .4s, opacity .4s; }
-    .live-orb[data-state="idle"], .live-orb[data-state="paused"] { filter: saturate(.55); opacity: .8; }
+    .live-orb[data-state="idle"], .live-orb[data-state="paused"] { filter: saturate(.6); opacity: .85; }
     .live-orb[data-state="thinking"] { background: radial-gradient(circle at 35% 30%, #fef08a, #f7d618 45%, #b45309 85%);
-      box-shadow: 0 0 50px rgba(247, 214, 24, .55); animation: live-breathe 1.1s ease-in-out infinite; }
+      box-shadow: 0 0 50px rgba(247, 214, 24, .5); animation: live-breathe 1.1s ease-in-out infinite; }
     .live-orb[data-state="speaking"] { background: radial-gradient(circle at 35% 30%, #fecaca, #ce1021 45%, #7f1d1d 85%);
-      box-shadow: 0 0 calc(30px + var(--lvl) * 90px) rgba(206, 16, 33, .5); }
+      box-shadow: 0 0 calc(30px + var(--lvl) * 90px) rgba(206, 16, 33, .45); }
     .live-orb[data-state="speaking"].no-level { animation: live-breathe .8s ease-in-out infinite; }
-    .live-orb .live-ring { position: absolute; inset: -16px; border-radius: 9999px; border: 2px solid rgba(247, 214, 24, .4); opacity: 0; }
+    .live-orb .live-ring { position: absolute; inset: -16px; border-radius: 9999px; border: 2px solid rgba(0, 127, 255, .35); opacity: 0; }
     .live-orb[data-state="listening"] .live-ring { animation: live-ripple 2s infinite ease-out; }
     @keyframes live-ripple { 0% { transform: scale(.95); opacity: .8; } 100% { transform: scale(1.5); opacity: 0; } }
     @keyframes live-breathe { 0%, 100% { transform: scale(.95); } 50% { transform: scale(1.07); } }
-    /* Custom Scrollbar for sleek appearance */
-    ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-    ::-webkit-scrollbar-track {
-      background: #e2e8f0;
-    }
-    .dark ::-webkit-scrollbar-track {
-      background: #080e1e;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #94a3b8;
-      border-radius: 9999px;
-    }
-    .dark ::-webkit-scrollbar-thumb {
-      background: #1e293b;
-    }
 
-    /* Adaptive Glassmorphism utilities (Light Mode default + Dark Mode support) */
-    .glass-panel {
-      /* flou léger : les masques de l'arrière-plan restent visibles à travers les panneaux */
-      background: rgba(255, 255, 255, 0.80);
-      backdrop-filter: blur(2px);
-      -webkit-backdrop-filter: blur(2px);
-      border: 1px solid rgba(0, 127, 255, 0.16);
-      box-shadow: 0 10px 30px -5px rgba(0, 82, 180, 0.07), 0 4px 12px -2px rgba(15, 23, 42, 0.04);
-    }
-    .dark .glass-panel {
-      background: rgba(6, 12, 26, 0.74);
-      border: 1px solid rgba(0, 127, 255, 0.18);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+    .dark ::-webkit-scrollbar-thumb { background: #22304f; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-    .glass-header {
-      background: rgba(255, 255, 255, 0.90);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border-bottom: 1px solid rgba(0, 127, 255, 0.15);
-    }
-    .dark .glass-header {
-      background: rgba(2, 4, 10, 0.90);
-      border-bottom: 1px solid rgba(0, 127, 255, 0.18);
-    }
+    .okapi-blue-text { background: linear-gradient(180deg, #0a8bff 0%, #0057c2 70%, #003580 100%);
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+    .dark .okapi-blue-text { background: linear-gradient(180deg, #7dd3fc 0%, #38a3ff 60%, #0a6fe0 100%);
+      -webkit-background-clip: text; background-clip: text; }
+    /* Drapeau de la RDC : bleu / jaune / rouge */
+    .drc-swoosh { background: linear-gradient(90deg, #007fff 0 40%, #f7d117 40% 66%, #ce1021 66% 100%); }
 
-    /* Electric Blue Logo Wordmark Gradient */
-    .okapi-blue-text {
-      background: linear-gradient(180deg, #0088ff 0%, #0055cc 60%, #002b7f 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-    .dark .okapi-blue-text {
-      background: linear-gradient(180deg, #38bdf8 0%, #007fff 55%, #003580 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
+    /* ---------- Masques congolais : discrets, sur les bords seulement ---------- */
+    :root { --mask-color: #7c2d12; --mask-opacity: .075; }
+    .dark { --mask-color: #fcd34d; --mask-opacity: .05; }
+    .heritage-layer { color: var(--mask-color);
+      -webkit-mask-image: radial-gradient(ellipse 62% 70% at 50% 50%, transparent 45%, #000 100%);
+              mask-image: radial-gradient(ellipse 62% 70% at 50% 50%, transparent 45%, #000 100%); }
+    .heritage-mask { position: absolute; opacity: calc(var(--mask-opacity) * var(--k, 1)); transform: rotate(var(--r, 0deg)); }
+    .heritage-mask svg { width: 100%; height: 100%; filter: url(#graffiti); overflow: visible; }
 
-    /* DRC Tricolor Accent Bar (Blue / Yellow / Red) */
-    .drc-swoosh {
-      background: linear-gradient(90deg, #007fff 0%, #007fff 38%, #f7d117 38%, #f7d117 68%, #ce1021 68%, #ce1021 100%);
-    }
+    .brand-mark { filter: drop-shadow(0 3px 8px rgba(0, 82, 180, .22)); transition: transform .3s ease; }
+    .brand-mark:hover { transform: scale(1.05) rotate(-2deg); }
+    .dark .brand-mark { filter: drop-shadow(0 0 8px rgba(56, 189, 248, .4)) drop-shadow(0 0 1px rgba(255, 255, 255, .4)); }
+    .dark .logo-halo img { filter: drop-shadow(0 0 1px rgba(255, 255, 255, .9)) drop-shadow(0 0 14px rgba(56, 189, 248, .3)); }
 
-    /* Circuit Pulse Glow */
-    .circuit-glow {
-      box-shadow: 0 4px 18px rgba(0, 127, 255, 0.22);
-    }
-    .dark .circuit-glow {
-      box-shadow: 0 0 20px rgba(0, 127, 255, 0.35), inset 0 0 12px rgba(0, 210, 255, 0.2);
-    }
-
-    /* ---------- Masques congolais en arrière-plan ---------- */
-    :root { --mask-color: #7c2d12; --mask-opacity: .14; }
-    .dark { --mask-color: #fcd34d; --mask-opacity: .10; }
-    .heritage-layer { color: var(--mask-color); }
-    .heritage-mask { position: absolute; opacity: calc(var(--mask-opacity) * var(--k, 1)); animation: mask-float 14s ease-in-out infinite; }
-    .heritage-mask.still { animation: none; transform: rotate(var(--r, 0deg)); }
-    .heritage-mask svg { width: 100%; height: 100%; }
-    .heritage-mask:nth-child(2n) { animation-duration: 18s; animation-delay: -6s; }
-    .heritage-mask:nth-child(3n) { animation-duration: 22s; animation-delay: -11s; }
-    @keyframes mask-float {
-      0%, 100% { transform: translateY(0) rotate(var(--r, 0deg)); }
-      50% { transform: translateY(-14px) rotate(calc(var(--r, 0deg) + 2deg)); }
-    }
-    /* trait « graffiti » : léger tremblé de bombe de peinture, sans aucun fond */
-    .heritage-mask svg { filter: url(#graffiti); overflow: visible; }
-    @media (prefers-reduced-motion: reduce) { .heritage-mask { animation: none; } }
-
-    /* ---------- Logo : lisible en clair comme en sombre ---------- */
-    .brand-mark { filter: drop-shadow(0 4px 10px rgba(0, 82, 180, .25)); transition: transform .3s ease; }
-    .brand-mark:hover { transform: scale(1.06) rotate(-2deg); }
-    .dark .brand-mark { filter: drop-shadow(0 0 10px rgba(56, 189, 248, .45)) drop-shadow(0 0 2px rgba(255, 255, 255, .35)); }
-    .dark .logo-halo img { filter: drop-shadow(0 0 1px rgba(255, 255, 255, .9)) drop-shadow(0 0 14px rgba(56, 189, 248, .35)); }
-
-    /* Hide scrollbar for horizontal nav on mobile */
-    .no-scrollbar::-webkit-scrollbar {
-      display: none;
-    }
-    .no-scrollbar {
-      -ms-overflow-style: none;
-      scrollbar-width: none;
-    }
+    /* Onglet actif : petit trait aux couleurs du drapeau */
+    .nav-btn.active::after { content: ""; position: absolute; left: 14px; right: 14px; bottom: -9px; height: 3px;
+      border-radius: 3px; background: linear-gradient(90deg, #007fff 0 40%, #f7d117 40% 66%, #ce1021 66% 100%); }
+    .tab-section:not(.hidden) { animation: tab-in .25s ease-out; }
+    @keyframes tab-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    @media (prefers-reduced-motion: reduce) { .tab-section:not(.hidden) { animation: none; } }
   </style>
 </head>
-<body class="bg-slate-50 dark:bg-obsidian-950 text-slate-800 dark:text-slate-100 font-sans antialiased min-h-screen flex flex-col selection:bg-okapi-blue/20 selection:text-blue-900 dark:selection:text-cyan-200 transition-colors duration-300">
+<body class="bg-[#f6f7fb] dark:bg-ink-950 text-slate-800 dark:text-slate-100 font-sans antialiased min-h-screen flex flex-col selection:bg-okapi-blue/20 transition-colors duration-300">
 
-  <!-- Ambient Background Glows (Soft Airy Blue, Gold & Crimson in Light Mode) -->
-  <div class="fixed inset-0 overflow-hidden pointer-events-none z-0">
-    <div class="absolute -top-40 -left-40 w-[28rem] h-[28rem] bg-sky-300/15 dark:bg-okapi-blue/10 rounded-full blur-3xl"></div>
-    <div class="absolute top-1/3 -right-40 w-[30rem] h-[30rem] bg-blue-200/20 dark:bg-cyan-500/5 rounded-full blur-3xl"></div>
-    <div class="absolute -bottom-40 left-1/4 w-96 h-96 bg-amber-200/20 dark:bg-okapi-yellow/5 rounded-full blur-3xl"></div>
-    <div class="absolute bottom-10 right-1/4 w-72 h-72 bg-rose-200/15 dark:bg-okapi-red/5 rounded-full blur-3xl"></div>
+  <!-- Lumières d'ambiance, très légères -->
+  <div class="fixed inset-0 overflow-hidden pointer-events-none z-0" aria-hidden="true">
+    <div class="absolute -top-48 -left-32 w-[34rem] h-[34rem] bg-sky-200/30 dark:bg-okapi-blue/10 rounded-full blur-3xl"></div>
+    <div class="absolute -bottom-48 -right-32 w-[30rem] h-[30rem] bg-amber-100/40 dark:bg-okapi-yellow/[0.04] rounded-full blur-3xl"></div>
   </div>
 
-  <!-- Patrimoine : masques congolais stylisés (songye, kuba, pende, luba, lega), au trait, façon graffiti -->
+  <!-- Patrimoine : masques congolais stylisés (songye, kuba, pende, luba, lega), au trait -->
   <div class="heritage-layer fixed inset-0 overflow-hidden pointer-events-none z-0" aria-hidden="true">
     <svg width="0" height="0" style="position:absolute">
       <filter id="graffiti" x="-10%" y="-10%" width="120%" height="120%">
@@ -197,8 +119,8 @@
     <div id="heritage-masks"></div>
   </div>
   <script>
-    // Beaucoup de masques sur tout l'écran : grille décalée (toujours la même disposition), recalculée
-    // quand la fenêtre change de taille.
+    // Quelques masques, en grille aérée (toujours la même disposition). Le centre de l'écran
+    // reste dégagé (masque CSS radial) : ils ne gênent jamais la lecture.
     (function () {
       const KINDS = [["songye", 260], ["kuba", 240], ["pende", 260], ["luba", 230], ["lega", 210]];
       const box = document.getElementById("heritage-masks");
@@ -206,19 +128,18 @@
         let seed = 7;
         const rnd = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
         const w = innerWidth, h = innerHeight;
-        const cw = w < 640 ? 150 : 210, ch = w < 640 ? 200 : 250;   // taille d'une case (px)
+        const cw = w < 640 ? 220 : 300, ch = w < 640 ? 280 : 340;
         const cols = Math.ceil(w / cw) + 1, rows = Math.ceil(h / ch) + 1;
         let html = "", i = 0;
         for (let r = 0; r < rows; r++) {
           for (let c = 0; c < cols; c++, i++) {
             const [kind, vh] = KINDS[(c * 2 + r * 3 + (r % 2)) % KINDS.length];
-            const mw = (w < 640 ? 70 : 95) + rnd() * 55;            // largeur du masque (px)
-            const x = (c - 0.5 + (r % 2) * 0.5) * cw + rnd() * cw * 0.35;
+            const mw = (w < 640 ? 70 : 100) + rnd() * 50;
+            const x = (c - 0.5 + (r % 2) * 0.5) * cw + rnd() * cw * 0.3;
             const y = (r - 0.5) * ch + rnd() * ch * 0.3;
-            const rot = (rnd() * 24 - 12).toFixed(1);
-            const op = (0.75 + rnd() * 0.5).toFixed(2);              // intensité légèrement variée
-            const anim = i % 3 === 0 ? "" : " still";
-            html += `<div class="heritage-mask${anim}" style="--r:${rot}deg;--k:${op};left:${x.toFixed(0)}px;top:${y.toFixed(0)}px;` +
+            const rot = (rnd() * 20 - 10).toFixed(1);
+            const op = (0.8 + rnd() * 0.4).toFixed(2);
+            html += `<div class="heritage-mask" style="--r:${rot}deg;--k:${op};left:${x.toFixed(0)}px;top:${y.toFixed(0)}px;` +
                     `width:${mw.toFixed(0)}px;height:${(mw * vh / 160).toFixed(0)}px"><svg viewBox="0 0 160 ${vh}">` +
                     `<use href="/assets/masques.svg#masque-${kind}"/></svg></div>`;
           }
@@ -231,219 +152,123 @@
     })();
   </script>
 
-  <!-- Toast Notification Container -->
   <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
 
-  <!-- HEADER -->
-  <header class="sticky top-0 z-40 glass-header transition-colors duration-300">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 h-18 sm:h-20 flex items-center justify-between gap-4 py-2">
-      <!-- Brand Identity matching the Geometric Okapi Emblem -->
-      <div class="flex items-center gap-3.5">
-        <div class="relative w-16 h-16 sm:w-[4.75rem] sm:h-[4.75rem] flex-shrink-0 flex items-center justify-center">
-          <img 
-            src="/assets/logo-mark.png" 
-            alt="Logo OkapiAI" 
-            onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
-            class="brand-mark w-full h-full object-contain"
-          >
-          <!-- Bespoke Geometric Okapi + Circuit + DRC Ribbon SVG Emblem -->
-          <svg style="display:none;" class="w-full h-full" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="okapiBlue" x1="0" y1="0" x2="120" y2="120" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stop-color="#38bdf8"/>
-                <stop offset="55%" stop-color="#007fff"/>
-                <stop offset="100%" stop-color="#002b7f"/>
-              </linearGradient>
-              <linearGradient id="okapiGold" x1="20" y1="15" x2="80" y2="75" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stop-color="#fef08a"/>
-                <stop offset="50%" stop-color="#f7d117"/>
-                <stop offset="100%" stop-color="#d97706"/>
-              </linearGradient>
-            </defs>
-            <circle cx="60" cy="62" r="46" stroke="url(#okapiBlue)" stroke-width="3" stroke-dasharray="190 35"/>
-            <circle cx="60" cy="62" r="40" stroke="#00d2ff" stroke-width="1.5" stroke-opacity="0.5"/>
-            <path d="M60 16V6M52 20V11M68 20V11M22 52H12M20 62H9M98 52H108M100 62H111" stroke="#00d2ff" stroke-width="2.2" stroke-linecap="round"/>
-            <circle cx="60" cy="5" r="3" fill="#38bdf8"/>
-            <circle cx="52" cy="10" r="2.5" fill="#00d2ff"/>
-            <circle cx="68" cy="10" r="2.5" fill="#00d2ff"/>
-            <circle cx="11" cy="52" r="2.5" fill="#38bdf8"/>
-            <circle cx="8" cy="62" r="2.5" fill="#00d2ff"/>
-            <circle cx="109" cy="52" r="2.5" fill="#38bdf8"/>
-            <circle cx="112" cy="62" r="2.5" fill="#00d2ff"/>
-            <polygon points="43,38 30,18 50,30" fill="url(#okapiGold)" stroke="#007fff" stroke-width="1.5"/>
-            <polygon points="75,38 88,18 68,30" fill="url(#okapiGold)" stroke="#007fff" stroke-width="1.5"/>
-            <polygon points="43,34 62,32 76,46 84,88 52,92 48,68 30,64 28,53" fill="url(#okapiBlue)"/>
-            <polygon points="56,34 67,44 58,64 49,54" fill="url(#okapiGold)"/>
-            <ellipse cx="47" cy="49" rx="3.2" ry="2.2" fill="#02040a"/>
-            <circle cx="46" cy="48.5" r="0.9" fill="#38bdf8"/>
-            <path d="M51 78 L78 58 L80 63 L52 83 Z" fill="#f7d117"/>
-            <path d="M52 83 L80 63 L82 69 L53 89 Z" fill="#ce1021"/>
-            <path d="M53 89 L82 69 L83 72 L54 91 Z" fill="#f7d117"/>
-            <polygon points="73,77 74.5,81 78.5,81 75.3,83.5 76.5,87.5 73,85 69.5,87.5 70.7,83.5 67.5,81 71.5,81" fill="#f7d117"/>
-          </svg>
+  <!-- EN-TÊTE -->
+  <header class="sticky top-0 z-40 bg-white/85 dark:bg-ink-950/85 backdrop-blur-xl border-b border-slate-200/70 dark:border-white/[0.06]">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 sm:h-[4.5rem] flex items-center justify-between gap-4">
+      <a href="/" class="flex items-center gap-3 min-w-0" aria-label="OkapiAI — accueil">
+        <img src="/assets/logo-mark.png" alt="" class="brand-mark w-11 h-11 sm:w-12 sm:h-12 object-contain flex-shrink-0">
+        <div class="min-w-0">
+          <div class="font-display font-black text-lg sm:text-xl tracking-wide leading-none okapi-blue-text">OKAPI AI</div>
+          <div class="h-[3px] w-24 sm:w-28 rounded-full drc-swoosh mt-1.5 mb-1"></div>
+          <p class="text-[11px] text-slate-500 dark:text-slate-400 font-semibold tracking-wide truncate">Lingala · Swahili · Kikongo · Tshiluba</p>
         </div>
+      </a>
 
-        <div>
-          <div class="font-display font-black text-xl sm:text-2xl tracking-wider flex items-center gap-1.5 leading-none">
-            <span class="okapi-blue-text">OKAPI AI</span>
-          </div>
-          <!-- DRC Tricolor Accent Swoosh under Wordmark -->
-          <div class="h-1 w-32 sm:w-40 rounded-full drc-swoosh my-1.5"></div>
-          <p class="text-[11px] sm:text-xs text-slate-600 dark:text-slate-300 font-semibold tracking-wide">
-            Lingala · Swahili · Kikongo · Tshiluba
-          </p>
-        </div>
-      </div>
-
-      <!-- Theme Switcher & Account Controls -->
-      <div class="flex items-center gap-2 sm:gap-3">
-        <button id="theme-toggle" type="button" title="Basculer Clair / Sombre" class="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-obsidian-800 dark:hover:bg-obsidian-850 border border-slate-200 dark:border-okapi-blue/30 text-slate-700 dark:text-okapi-yellow transition-all cursor-pointer">
+      <div class="flex items-center gap-2">
+        <button id="theme-toggle" type="button" title="Thème clair / sombre" aria-label="Changer de thème"
+                class="w-10 h-10 inline-flex items-center justify-center rounded-xl text-slate-600 dark:text-okapi-yellow hover:bg-slate-100 dark:hover:bg-white/5 border border-slate-200 dark:border-white/10 transition cursor-pointer">
           <i id="theme-icon-moon" data-lucide="moon" class="w-4 h-4"></i>
           <i id="theme-icon-sun" data-lucide="sun" class="w-4 h-4 hidden"></i>
         </button>
-        <div id="account" class="flex items-center gap-2.5">
-          <!-- Populated dynamically via JS -->
-        </div>
+        <div id="account" class="flex items-center gap-2"></div>
       </div>
     </div>
 
-    <!-- NAVIGATION BAR -->
-    <div class="border-t border-slate-200/80 dark:border-okapi-blue/15 bg-white/70 dark:bg-obsidian-900/70">
-      <nav class="max-w-6xl mx-auto px-4 sm:px-6 flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-2" aria-label="Navigation principale">
-        <button data-tab="chat" class="nav-btn active flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap cursor-pointer">
-          <i data-lucide="message-square" class="w-4 h-4"></i>
-          <span>Chat & Traduction</span>
-        </button>
-        <button data-tab="voice" class="nav-btn flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap cursor-pointer">
-          <i data-lucide="mic" class="w-4 h-4"></i>
-          <span>Voix Live</span>
-        </button>
-        <button data-tab="contribute" class="nav-btn flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap cursor-pointer">
-          <i data-lucide="database" class="w-4 h-4"></i>
-          <span>Contribuer</span>
-        </button>
-        <button data-tab="learn" class="nav-btn flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap cursor-pointer">
-          <i data-lucide="graduation-cap" class="w-4 h-4"></i>
-          <span>Apprendre</span>
-        </button>
-        <button data-tab="admin" id="admin-tab" class="nav-btn flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ml-auto text-amber-700 dark:text-okapi-yellow hover:bg-amber-50 dark:hover:bg-okapi-yellow/10 cursor-pointer">
-          <i data-lucide="shield-check" class="w-4 h-4"></i>
-          <span>Admin</span>
-        </button>
+    <div class="border-t border-slate-200/60 dark:border-white/[0.05]">
+      <nav class="max-w-6xl mx-auto px-3 sm:px-6 flex items-center md:justify-center gap-1 overflow-x-auto no-scrollbar py-2" aria-label="Navigation principale">
+        <button data-tab="chat" class="nav-btn active"><i data-lucide="message-square" class="w-4 h-4"></i><span>Chat & Traduction</span></button>
+        <button data-tab="voice" class="nav-btn"><i data-lucide="mic" class="w-4 h-4"></i><span>Voix Live</span></button>
+        <button data-tab="contribute" class="nav-btn"><i data-lucide="hand-heart" class="w-4 h-4"></i><span>Contribuer</span></button>
+        <button data-tab="learn" class="nav-btn"><i data-lucide="graduation-cap" class="w-4 h-4"></i><span>Apprendre</span></button>
+        <button data-tab="admin" id="admin-tab" class="nav-btn !text-amber-700 dark:!text-okapi-yellow"><i data-lucide="shield-check" class="w-4 h-4"></i><span>Admin</span></button>
       </nav>
     </div>
   </header>
 
-  <!-- MAIN CONTENT -->
   <main class="relative z-10 flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
 
-    <!-- ==========================================
-         TAB 1: CHAT / TRADUCTION
-         ========================================== -->
-    <section id="tab-chat" class="tab-section space-y-5">
-      <!-- Top Control Bar -->
-      <div class="glass-panel rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <!-- Segmented Mode Switcher -->
-        <div class="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-obsidian-950/90 border border-slate-200 dark:border-okapi-blue/20 self-start" data-modes="chat">
-          <button type="button" data-mode="converse" class="mode-btn active flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer">
-            <i data-lucide="bot" class="w-4 h-4"></i>
-            <span>Converser</span>
-          </button>
-          <button type="button" data-mode="translate" class="mode-btn flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer">
-            <i data-lucide="languages" class="w-4 h-4"></i>
-            <span>Traduire</span>
-          </button>
+    <!-- ============ CHAT / TRADUCTION ============ -->
+    <section id="tab-chat" class="tab-section">
+      <div class="glass-panel rounded-3xl overflow-hidden flex flex-col max-w-4xl mx-auto h-[calc(100vh-12rem)] min-h-[520px] max-h-[760px]">
+        <!-- Barre d'outils -->
+        <div class="px-4 sm:px-5 py-3 border-b border-slate-200/70 dark:border-white/[0.06] flex flex-col items-center gap-3">
+          <div class="seg" data-modes="chat">
+            <button type="button" data-mode="converse" class="mode-btn active"><i data-lucide="messages-square" class="w-4 h-4"></i><span>Converser</span></button>
+            <button type="button" data-mode="translate" class="mode-btn"><i data-lucide="languages" class="w-4 h-4"></i><span>Traduire</span></button>
+          </div>
+          <div class="flex flex-wrap items-center justify-center gap-2">
+            <div class="relative">
+              <select id="chat-src" class="lang-select select" aria-label="Langue"></select>
+              <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            </div>
+            <button id="chat-swap" type="button" title="Inverser les langues" class="translate-only hidden w-10 h-10 inline-flex items-center justify-center rounded-xl border border-slate-200 dark:border-white/10 text-slate-500 hover:text-okapi-blue hover:border-okapi-blue/40 transition cursor-pointer">
+              <i data-lucide="arrow-left-right" class="w-4 h-4"></i>
+            </button>
+            <div class="relative translate-only hidden">
+              <select id="chat-tgt" class="lang-select select" aria-label="Langue cible"></select>
+              <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            </div>
+            <span id="ai-badge" class="converse-only pill bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-500/20">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span id="ai-badge-text">…</span>
+            </span>
+          </div>
         </div>
 
-        <!-- Language Selectors -->
-        <div class="flex flex-wrap items-center gap-2.5">
-          <div class="relative">
-            <select id="chat-src" class="lang-select appearance-none bg-white dark:bg-obsidian-900 border border-slate-300 dark:border-okapi-blue/25 hover:border-okapi-blue text-slate-800 dark:text-slate-100 text-sm font-semibold rounded-xl pl-3.5 pr-9 py-2.5 focus:outline-none focus:ring-2 focus:ring-okapi-blue/30 transition-colors cursor-pointer shadow-xs"></select>
-            <i data-lucide="chevron-down" class="w-4 h-4 text-okapi-blue dark:text-okapi-cyan absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
-          </div>
-
-          <button id="chat-swap" type="button" title="Inverser les langues" class="translate-only hidden p-2.5 rounded-xl bg-white dark:bg-obsidian-900 border border-slate-300 dark:border-okapi-blue/25 hover:border-okapi-blue hover:text-okapi-blue text-slate-600 dark:text-slate-300 transition-all active:scale-95 cursor-pointer shadow-xs">
-            <i data-lucide="arrow-left-right" class="w-4 h-4"></i>
-          </button>
-
-          <div class="relative translate-only hidden">
-            <select id="chat-tgt" class="lang-select appearance-none bg-white dark:bg-obsidian-900 border border-slate-300 dark:border-okapi-blue/25 hover:border-okapi-blue text-slate-800 dark:text-slate-100 text-sm font-semibold rounded-xl pl-3.5 pr-9 py-2.5 focus:outline-none focus:ring-2 focus:ring-okapi-blue/30 transition-colors cursor-pointer shadow-xs"></select>
-            <i data-lucide="chevron-down" class="w-4 h-4 text-okapi-blue dark:text-okapi-cyan absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
-          </div>
-
-          <span id="ai-badge" class="converse-only inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-blue-50 dark:bg-okapi-blue/15 text-blue-700 dark:text-okapi-cyan border border-blue-200 dark:border-okapi-blue/30">
-            <span class="w-2 h-2 rounded-full bg-amber-500 dark:bg-okapi-yellow animate-pulse"></span>
-            <span id="ai-badge-text">…</span>
-          </span>
-        </div>
-      </div>
-
-      <!-- Chat Conversation Window -->
-      <div class="glass-panel rounded-2xl flex flex-col h-[540px] sm:h-[580px] overflow-hidden">
-        <!-- Messages Feed -->
-        <div id="chat-log" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-gradient-to-b from-white/40 to-slate-50/60 dark:from-transparent dark:to-transparent">
-          <!-- Initial Welcome Message -->
-          <div class="log-placeholder flex flex-col items-center text-center pt-2 pb-4">
-            <div class="logo-halo w-36 h-36 sm:w-44 sm:h-44">
+        <!-- Messages -->
+        <div id="chat-log" class="flex-1 overflow-y-auto px-4 sm:px-6 py-5 space-y-4">
+          <div class="log-placeholder flex flex-col items-center text-center pt-4 pb-2">
+            <div class="logo-halo w-32 h-32 sm:w-40 sm:h-40">
               <img src="/assets/logo.png" alt="OkapiAI" class="w-full h-full object-contain dark:hidden">
               <img src="/assets/logo-dark.png" alt="OkapiAI" class="w-full h-full object-contain hidden dark:block">
             </div>
-            <p class="mt-2 text-xs font-semibold tracking-[0.2em] uppercase text-amber-800/80 dark:text-okapi-yellow/80">Langues · Cultures · Intelligence</p>
-          </div>
-          <div class="flex items-start gap-3.5 max-w-2xl">
-            <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-okapi-blue to-blue-800 border border-blue-400/50 flex items-center justify-center text-okapi-yellow font-display font-black text-xs flex-shrink-0 shadow-md">
-              AI
-            </div>
-            <div class="bg-white dark:bg-obsidian-800/90 border border-slate-200/90 dark:border-okapi-blue/20 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-slate-700 dark:text-slate-200 leading-relaxed shadow-sm">
-              <p class="font-bold text-blue-700 dark:text-okapi-yellow mb-1">Mbote ! Jambo ! Moyo ! Mbote na nge !</p>
-              <p>Bienvenue sur <strong>OkapiAI</strong>, l'intelligence artificielle dédiée aux langues de la RDC. Sélectionnez votre langue ci-dessus pour dialoguer ou traduire instantanément.</p>
-            </div>
+            <h1 class="mt-3 font-display font-extrabold text-2xl sm:text-3xl text-slate-900 dark:text-white tracking-tight">Mbote ! Jambo ! Moyo !</h1>
+            <p class="mt-2 text-sm text-slate-500 dark:text-slate-400 max-w-md">Discutez ou traduisez en lingala, swahili, kikongo et tshiluba. Choisissez une langue, puis écrivez — ou essayez un exemple ci-dessous.</p>
           </div>
         </div>
 
-        <!-- Quick Suggestion Chips -->
-        <div class="px-4 py-2.5 border-t border-slate-200/80 dark:border-okapi-blue/15 bg-slate-50/90 dark:bg-obsidian-900/60 flex items-center gap-2 overflow-x-auto no-scrollbar">
-          <span class="text-xs text-blue-700 dark:text-okapi-cyan font-bold whitespace-nowrap">Exemples :</span>
-          <button type="button" data-lang="ln" class="quick-prompt text-xs px-3 py-1.5 rounded-lg bg-white hover:bg-blue-50 dark:bg-okapi-blue/10 dark:hover:bg-okapi-blue/20 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-okapi-blue/20 whitespace-nowrap transition-colors cursor-pointer shadow-2xs">Mbote, sango nini ?</button>
-          <button type="button" data-lang="ln" class="quick-prompt text-xs px-3 py-1.5 rounded-lg bg-white hover:bg-blue-50 dark:bg-okapi-blue/10 dark:hover:bg-okapi-blue/20 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-okapi-blue/20 whitespace-nowrap transition-colors cursor-pointer shadow-2xs">Que veut dire ndako ?</button>
-          <button type="button" data-lang="ln" class="quick-prompt text-xs px-3 py-1.5 rounded-lg bg-white hover:bg-blue-50 dark:bg-okapi-blue/10 dark:hover:bg-okapi-blue/20 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-okapi-blue/20 whitespace-nowrap transition-colors cursor-pointer shadow-2xs">Comment dit-on « eau » en lingala ?</button>
-          <button type="button" data-lang="sw" class="quick-prompt text-xs px-3 py-1.5 rounded-lg bg-white hover:bg-blue-50 dark:bg-okapi-blue/10 dark:hover:bg-okapi-blue/20 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-okapi-blue/20 whitespace-nowrap transition-colors cursor-pointer shadow-2xs">Habari ya asubuhi ?</button>
-          <button type="button" data-lang="lua" class="quick-prompt text-xs px-3 py-1.5 rounded-lg bg-white hover:bg-blue-50 dark:bg-okapi-blue/10 dark:hover:bg-okapi-blue/20 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-okapi-blue/20 whitespace-nowrap transition-colors cursor-pointer shadow-2xs">Udi bimpe ?</button>
+        <!-- Exemples -->
+        <div class="px-4 sm:px-5 py-2.5 flex items-center md:justify-center gap-2 overflow-x-auto no-scrollbar">
+          <span class="eyebrow whitespace-nowrap mr-1">Essayez</span>
+          <button type="button" data-lang="ln" class="quick-prompt chip">Mbote, sango nini ?</button>
+          <button type="button" data-lang="ln" class="quick-prompt chip">Que veut dire ndako ?</button>
+          <button type="button" data-lang="ln" class="quick-prompt chip">Comment dit-on « eau » en lingala ?</button>
+          <button type="button" data-lang="sw" class="quick-prompt chip">Habari ya asubuhi ?</button>
+          <button type="button" data-lang="lua" class="quick-prompt chip">Udi bimpe ?</button>
         </div>
 
-        <!-- Composer Input -->
-        <form id="chat-form" class="p-3 sm:p-4 bg-white dark:bg-obsidian-900/95 border-t border-slate-200 dark:border-okapi-blue/20 flex items-center gap-3">
-          <input 
-            id="chat-input" 
-            type="text"
-            placeholder="Écrivez en Lingala, Swahili, Kikongo, Tshiluba ou Français…" 
-            autocomplete="off" 
-            required
-            class="flex-1 bg-slate-50 dark:bg-obsidian-950 border border-slate-300 dark:border-okapi-blue/25 focus:border-okapi-blue rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-okapi-blue/25 transition-all"
-          >
-          <button type="submit" class="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-okapi-blue to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold text-sm shadow-md shadow-okapi-blue/25 transition-all active:scale-95 cursor-pointer">
-            <span class="hidden sm:inline">Envoyer</span>
-            <i data-lucide="send" class="w-4 h-4"></i>
-          </button>
+        <!-- Saisie -->
+        <form id="chat-form" class="p-3 sm:p-4 pt-1 sm:pt-1">
+          <div class="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-50 dark:bg-ink-950/70 border border-slate-200 dark:border-white/10 focus-within:border-okapi-blue focus-within:ring-4 focus-within:ring-okapi-blue/10 transition">
+            <input id="chat-input" type="text" autocomplete="off" required
+                   placeholder="Écrivez en lingala, swahili, kikongo, tshiluba ou français…"
+                   class="flex-1 min-w-0 bg-transparent px-3 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none">
+            <button type="submit" class="btn-primary !rounded-xl" aria-label="Envoyer">
+              <span class="hidden sm:inline">Envoyer</span><i data-lucide="send-horizontal" class="w-4 h-4"></i>
+            </button>
+          </div>
         </form>
       </div>
     </section>
 
-    <!-- ==========================================
-         TAB 2: VOIX LIVE — conversation en direct avec OkapiAI
-         ========================================== -->
+    <!-- ============ VOIX LIVE ============ -->
     <section id="tab-voice" class="tab-section hidden">
-      <div class="glass-panel rounded-2xl p-5 sm:p-8 min-h-[600px] flex flex-col items-center">
+      <div class="glass-panel rounded-3xl p-5 sm:p-8 min-h-[600px] flex flex-col items-center">
         <div class="w-full flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 class="font-display text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <h2 class="card-title text-lg flex items-center gap-2">
               <span class="inline-block w-2.5 h-2.5 rounded-full bg-okapi-red" id="live-dot"></span> OkapiAI Live
             </h2>
-            <p class="text-xs text-slate-500 dark:text-slate-400">Parlez naturellement : OkapiAI vous écoute, vous répond à voix haute et vous pose des questions.</p>
+            <p class="text-sm text-slate-500 dark:text-slate-400">Parlez naturellement : OkapiAI vous écoute et vous répond à voix haute.</p>
           </div>
-          <label class="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
-            <span>Langue</span>
-            <select id="live-lang" class="bg-white dark:bg-obsidian-900 border border-slate-300 dark:border-okapi-blue/25 text-slate-800 dark:text-slate-100 text-sm font-semibold rounded-xl px-3 py-2 focus:outline-none focus:border-okapi-blue"></select>
+          <label class="flex items-center gap-2">
+            <span class="eyebrow">Langue</span>
+            <span class="relative">
+              <select id="live-lang" class="select"></select>
+              <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            </span>
           </label>
         </div>
 
@@ -453,283 +278,243 @@
             <span class="live-ring"></span>
             <i data-lucide="audio-lines" class="w-12 h-12 text-white/90 drop-shadow"></i>
           </button>
-          <p id="live-status" class="mt-10 text-base sm:text-lg font-bold text-slate-800 dark:text-slate-100 text-center">Appuyez sur « Commencer » pour parler avec OkapiAI</p>
+          <p id="live-status" class="mt-10 text-base sm:text-lg font-semibold text-slate-800 dark:text-slate-100 text-center">Appuyez sur « Commencer » pour parler avec OkapiAI</p>
           <p id="live-user" class="mt-6 text-sm text-slate-500 dark:text-slate-400 italic max-w-xl text-center min-h-[1.25rem]"></p>
           <p id="live-bot" class="mt-3 text-xl sm:text-2xl font-semibold text-slate-900 dark:text-white max-w-2xl text-center leading-snug min-h-[2rem]"></p>
           <p id="live-bot-fr" class="hidden mt-2 text-sm text-slate-500 dark:text-slate-400 max-w-xl text-center"></p>
         </div>
 
         <div class="flex flex-wrap items-center justify-center gap-3">
-          <button id="live-start" type="button" class="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-okapi-blue to-blue-600 hover:brightness-110 text-white font-bold shadow-lg shadow-okapi-blue/30 cursor-pointer">
+          <button id="live-start" type="button" class="btn-primary !rounded-full !px-6 !py-3 !text-base">
             <i data-lucide="mic" class="w-5 h-5"></i> Commencer la conversation
           </button>
-          <button id="live-end" type="button" class="hidden inline-flex items-center gap-2 px-6 py-3 rounded-full bg-okapi-red hover:brightness-110 text-white font-bold shadow-lg shadow-okapi-red/30 cursor-pointer">
+          <button id="live-end" type="button" class="hidden btn !rounded-full px-6 py-3 text-base bg-okapi-red hover:brightness-110 text-white shadow-sm shadow-okapi-red/30">
             <i data-lucide="phone-off" class="w-5 h-5"></i> Terminer
           </button>
-          <label class="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 cursor-pointer select-none">
+          <label class="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300 cursor-pointer select-none">
             <input id="live-fr" type="checkbox" class="w-4 h-4 accent-okapi-blue cursor-pointer"> Sous-titres en français
           </label>
         </div>
-        <p id="live-info" class="mt-4 text-[11px] text-slate-500 dark:text-slate-400 text-center max-w-xl"></p>
+        <p id="live-info" class="mt-4 text-xs text-slate-500 dark:text-slate-400 text-center max-w-xl"></p>
 
-        <details class="w-full mt-6 border-t border-slate-200 dark:border-okapi-blue/15 pt-4">
-          <summary class="cursor-pointer text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-okapi-cyan">Historique de la conversation</summary>
+        <details class="w-full mt-6 border-t border-slate-200 dark:border-white/[0.06] pt-4">
+          <summary class="cursor-pointer eyebrow !text-okapi-deep dark:!text-okapi-cyan">Historique de la conversation</summary>
           <div id="live-history" class="mt-3 space-y-2 max-h-72 overflow-y-auto pr-1 text-sm"></div>
         </details>
       </div>
     </section>
 
-    <!-- ==========================================
-         TAB 3: CONTRIBUER AU DATASET
-         ========================================== -->
+    <!-- ============ CONTRIBUER ============ -->
     <section id="tab-contribute" class="tab-section hidden space-y-6">
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        <!-- Left Column: Submission Form -->
-        <div class="lg:col-span-7 glass-panel rounded-2xl p-5 sm:p-6 space-y-5">
-          <div class="flex items-start justify-between gap-4">
-            <div>
-              <h2 class="font-display font-bold text-lg sm:text-xl text-slate-900 dark:text-white">Enrichir le Corpus National</h2>
-              <p class="mt-1 text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                Une entrée intègre le modèle dès que <strong class="text-amber-600 dark:text-okapi-yellow">10 personnes différentes</strong> l'ont proposée, puis qu'un administrateur l'a validée.
-              </p>
-            </div>
-            <span class="px-2.5 py-1 rounded-lg bg-amber-100 dark:bg-okapi-yellow/15 border border-amber-300 dark:border-okapi-yellow/30 text-amber-800 dark:text-okapi-yellow text-xs font-bold whitespace-nowrap">
-              <span class="min-similar">10</span> personnes + admin
-            </span>
+      <!-- Comment ça marche -->
+      <div class="glass-panel rounded-3xl p-5 sm:p-6">
+        <div class="flex flex-col lg:flex-row lg:items-center gap-5 lg:gap-8">
+          <div class="lg:max-w-xs">
+            <p class="eyebrow !text-amber-700 dark:!text-okapi-yellow">Ensemble, on construit le dataset</p>
+            <h2 class="card-title text-xl sm:text-2xl mt-1">Apprenez vos langues à OkapiAI</h2>
           </div>
+          <ol class="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <li class="flex gap-3 p-3.5 rounded-2xl bg-okapi-blue/[0.06] dark:bg-okapi-blue/10 border border-okapi-blue/15">
+              <span class="w-8 h-8 flex-shrink-0 rounded-full bg-okapi-blue text-white text-sm font-bold flex items-center justify-center">1</span>
+              <div><p class="text-sm font-bold text-slate-900 dark:text-white">Proposez</p><p class="text-xs text-slate-600 dark:text-slate-400">une traduction ou un dialogue, avec votre voix si possible.</p></div>
+            </li>
+            <li class="flex gap-3 p-3.5 rounded-2xl bg-amber-50 dark:bg-okapi-yellow/[0.07] border border-amber-200/70 dark:border-okapi-yellow/15">
+              <span class="w-8 h-8 flex-shrink-0 rounded-full bg-okapi-yellow text-slate-900 text-sm font-bold flex items-center justify-center">2</span>
+              <div><p class="text-sm font-bold text-slate-900 dark:text-white"><span class="min-similar">3</span> personnes confirment</p><p class="text-xs text-slate-600 dark:text-slate-400">ou proposent une correction si ce n'est pas juste.</p></div>
+            </li>
+            <li class="flex gap-3 p-3.5 rounded-2xl bg-rose-50 dark:bg-okapi-red/[0.08] border border-rose-200/70 dark:border-okapi-red/20">
+              <span class="w-8 h-8 flex-shrink-0 rounded-full bg-okapi-red text-white text-sm font-bold flex items-center justify-center">3</span>
+              <div><p class="text-sm font-bold text-slate-900 dark:text-white">Un admin valide</p><p class="text-xs text-slate-600 dark:text-slate-400">et l'entrée sert à entraîner OkapiAI.</p></div>
+            </li>
+          </ol>
+        </div>
+      </div>
 
-          <!-- Contribution Mode Switcher -->
-          <div class="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-obsidian-950/90 border border-slate-200 dark:border-okapi-blue/20" data-modes="contrib">
-            <button type="button" data-mode="translate" class="mode-btn active flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer">
-              <i data-lucide="repeat" class="w-4 h-4"></i>
-              <span>Paire de Traduction</span>
-            </button>
-            <button type="button" data-mode="converse" class="mode-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer">
-              <i data-lucide="message-circle-plus" class="w-4 h-4"></i>
-              <span>Dialogue IA</span>
-            </button>
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <!-- Formulaire -->
+        <div class="lg:col-span-7 glass-panel rounded-3xl p-5 sm:p-6 space-y-5">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <h3 class="card-title text-lg">Nouvelle contribution</h3>
+            <div class="seg" data-modes="contrib">
+              <button type="button" data-mode="translate" class="mode-btn active"><i data-lucide="repeat" class="w-4 h-4"></i><span>Traduction</span></button>
+              <button type="button" data-mode="converse" class="mode-btn"><i data-lucide="message-circle-plus" class="w-4 h-4"></i><span>Dialogue</span></button>
+            </div>
           </div>
+          <p class="text-sm text-slate-600 dark:text-slate-400 -mt-2">
+            <span class="translate-only">Une phrase et sa traduction exacte. L'une des deux langues doit être congolaise.</span>
+            <span class="converse-only hidden">Un message et la réponse naturelle qu'OkapiAI devrait donner, dans la même langue.</span>
+          </p>
 
           <form id="contrib-form" class="space-y-4">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Langue source</label>
-                <select name="source_lang" class="lang-select w-full bg-white dark:bg-obsidian-900 border border-slate-300 dark:border-okapi-blue/25 rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:border-okapi-blue"></select>
-              </div>
-              <div class="translate-only">
-                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Langue cible</label>
-                <select name="target_lang" class="lang-select w-full bg-white dark:bg-obsidian-900 border border-slate-300 dark:border-okapi-blue/25 rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:border-okapi-blue"></select>
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                <span class="translate-only">Phrase originale</span>
-                <span class="converse-only hidden">Question / Invite utilisateur</span>
+            <div class="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3 items-end">
+              <label class="block">
+                <span class="eyebrow block mb-1.5"><span class="translate-only">De</span><span class="converse-only hidden">Langue</span></span>
+                <span class="relative block">
+                  <select name="source_lang" class="lang-select select w-full"></select>
+                  <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+                </span>
               </label>
-              <input name="source_text" type="text" required placeholder="Ex: Boni, ozali malamu ?" class="w-full bg-white dark:bg-obsidian-900 border border-slate-300 dark:border-okapi-blue/25 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-okapi-blue">
-            </div>
-
-            <div>
-              <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                <span class="translate-only">Traduction exacte</span>
-                <span class="converse-only hidden">Réponse idéale du bot</span>
+              <button id="contrib-swap" type="button" title="Inverser les langues" class="translate-only hidden sm:inline-flex w-10 h-10 items-center justify-center rounded-xl border border-slate-200 dark:border-white/10 text-slate-500 hover:text-okapi-blue hover:border-okapi-blue/40 transition cursor-pointer">
+                <i data-lucide="arrow-left-right" class="w-4 h-4"></i>
+              </button>
+              <label class="block translate-only">
+                <span class="eyebrow block mb-1.5">Vers</span>
+                <span class="relative block">
+                  <select name="target_lang" class="lang-select select w-full"></select>
+                  <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+                </span>
               </label>
-              <input name="target_text" type="text" required placeholder="Ex: Bonjour, comment vas-tu ?" class="w-full bg-white dark:bg-obsidian-900 border border-slate-300 dark:border-okapi-blue/25 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-okapi-blue">
             </div>
 
-            <!-- Optional Audio Recorder -->
-            <div class="p-3.5 rounded-xl bg-slate-100/80 dark:bg-obsidian-900/80 border border-slate-200 dark:border-okapi-blue/15 flex flex-wrap items-center justify-between gap-3">
-              <div class="flex items-center gap-2.5">
-                <button type="button" id="contrib-rec-btn" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-white hover:bg-blue-50 dark:bg-okapi-blue/15 dark:hover:bg-okapi-blue/25 text-xs font-semibold text-slate-800 dark:text-slate-100 border border-slate-300 dark:border-okapi-blue/30 transition-colors cursor-pointer shadow-2xs">
-                  <i data-lucide="mic" class="w-3.5 h-3.5 text-okapi-red"></i>
-                  <span>Enregistrer la prononciation</span>
+            <label class="block">
+              <span class="eyebrow block mb-1.5"><span class="translate-only">Phrase originale</span><span class="converse-only hidden">Message de l'utilisateur</span></span>
+              <input name="source_text" type="text" required maxlength="500" placeholder="Ex : Boni, ozali malamu ?" class="field">
+            </label>
+
+            <label class="block">
+              <span class="eyebrow block mb-1.5"><span class="translate-only">Traduction exacte</span><span class="converse-only hidden">Réponse idéale d'OkapiAI</span></span>
+              <input name="target_text" type="text" required maxlength="500" placeholder="Ex : Bonjour, comment vas-tu ?" class="field">
+            </label>
+
+            <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-ink-950/50 border border-dashed border-slate-300 dark:border-white/10 flex flex-wrap items-center justify-between gap-3">
+              <div class="flex items-center gap-3">
+                <button type="button" id="contrib-rec-btn" class="btn-ghost !py-2 !px-3.5">
+                  <i data-lucide="mic" class="w-4 h-4 text-okapi-red"></i><span>Enregistrer la prononciation</span>
                 </button>
-                <span id="contrib-rec-status" class="text-xs text-slate-500 dark:text-slate-400">Optionnel (TTS / ASR)</span>
+                <span id="contrib-rec-status" class="text-xs text-slate-500 dark:text-slate-400">Optionnel — aide à entraîner la voix</span>
               </div>
-              <audio id="contrib-audio" controls class="hidden h-8 max-w-[200px]"></audio>
+              <audio id="contrib-audio" controls class="hidden h-9 max-w-[220px]"></audio>
             </div>
 
-            <button type="submit" class="w-full py-3 px-5 rounded-xl bg-gradient-to-r from-okapi-blue to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold text-sm shadow-md shadow-okapi-blue/25 transition-all active:scale-[0.99] cursor-pointer">
-              Soumettre au corpus communautaire
+            <button type="submit" class="btn-primary w-full !py-3">
+              <i data-lucide="send" class="w-4 h-4"></i> Envoyer ma contribution
             </button>
           </form>
         </div>
 
-        <!-- Right Column: Community Verification & User History -->
+        <!-- À confirmer + mes contributions -->
         <div class="lg:col-span-5 space-y-6">
-          <!-- Community Validation Queue -->
-          <div class="glass-panel rounded-2xl p-5 sm:p-6 space-y-4">
+          <div class="glass-panel rounded-3xl p-5 sm:p-6 space-y-4">
             <div class="flex items-center justify-between gap-2">
               <div>
-                <h3 class="font-display font-bold text-base text-slate-900 dark:text-white">Validation Communautaire</h3>
-                <p class="text-xs text-slate-500 dark:text-slate-400">Confirmez les traductions proposées</p>
+                <h3 class="card-title text-base">À confirmer</h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Est-ce correct ? Confirmez ou corrigez.</p>
               </div>
-              <select id="prop-filter" class="bg-white dark:bg-obsidian-900 border border-slate-300 dark:border-okapi-blue/25 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none">
-                <option value="">Toutes</option>
-                <option value="ln">Lingala</option>
-                <option value="sw">Swahili</option>
-                <option value="kg">Kikongo</option>
-                <option value="lua">Tshiluba</option>
-              </select>
+              <span class="relative">
+                <select id="prop-filter" class="select !py-1.5 !text-xs" aria-label="Filtrer par langue">
+                  <option value="">Toutes</option>
+                </select>
+                <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+              </span>
             </div>
-
-            <div id="proposals" class="space-y-3 max-h-80 overflow-y-auto pr-1">
-              <!-- Populated by JS -->
-            </div>
+            <div id="proposals" class="space-y-3 max-h-[28rem] overflow-y-auto pr-1 -mr-1"></div>
           </div>
 
-          <!-- My Contributions -->
-          <div class="glass-panel rounded-2xl p-5 sm:p-6 space-y-3">
-            <h3 class="font-display font-bold text-base text-slate-900 dark:text-white flex items-center justify-between">
-              <span>Mes contributions récentes</span>
-              <span id="mine-count" class="text-xs font-sans font-bold px-2.5 py-0.5 rounded-full bg-blue-100 dark:bg-okapi-blue/20 text-blue-700 dark:text-okapi-cyan">0</span>
+          <div class="glass-panel rounded-3xl p-5 sm:p-6 space-y-3">
+            <h3 class="card-title text-base flex items-center justify-between">
+              <span>Mes contributions</span>
+              <span id="mine-count" class="pill bg-okapi-blue/10 text-okapi-deep dark:text-okapi-cyan font-sans">0</span>
             </h3>
-            <div id="mine" class="space-y-2.5 max-h-48 overflow-y-auto pr-1">
-              <!-- Populated by JS -->
-            </div>
+            <div id="mine" class="space-y-2.5 max-h-72 overflow-y-auto pr-1 -mr-1"></div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ==========================================
-         TAB 4: APPRENDRE (FLASHCARDS & QUIZ)
-         ========================================== -->
+    <!-- ============ APPRENDRE ============ -->
     <section id="tab-learn" class="tab-section hidden space-y-6">
-      <!-- Top Controls -->
-      <div class="glass-panel rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div class="glass-panel rounded-3xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-blue-100 dark:bg-okapi-blue/15 border border-blue-200 dark:border-okapi-blue/30 flex items-center justify-center text-okapi-blue dark:text-okapi-cyan">
+          <div class="w-11 h-11 rounded-2xl bg-okapi-blue/10 flex items-center justify-center text-okapi-blue dark:text-okapi-cyan">
             <i data-lucide="book-open" class="w-5 h-5"></i>
           </div>
           <div>
-            <label for="learn-lang" class="block text-xs text-slate-500 dark:text-slate-400 font-semibold">Langue étudiée</label>
-            <select id="learn-lang" class="bg-transparent text-slate-900 dark:text-white font-display font-bold text-base focus:outline-none cursor-pointer">
-              <option value="ln" class="bg-white dark:bg-obsidian-900">Lingala</option>
-              <option value="sw" class="bg-white dark:bg-obsidian-900">Swahili</option>
-              <option value="kg" class="bg-white dark:bg-obsidian-900">Kikongo</option>
-              <option value="lua" class="bg-white dark:bg-obsidian-900">Tshiluba</option>
-            </select>
+            <label for="learn-lang" class="eyebrow block">Langue étudiée</label>
+            <select id="learn-lang" class="bg-transparent text-slate-900 dark:text-white font-display font-bold text-lg focus:outline-none cursor-pointer -ml-1"></select>
           </div>
         </div>
-
-        <div class="flex items-center gap-2">
-          <button id="learn-cards-btn" type="button" class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-okapi-blue text-white font-semibold text-sm shadow-md shadow-okapi-blue/25 transition-all cursor-pointer">
-            <i data-lucide="layers" class="w-4 h-4"></i>
-            <span>Cartes Mémoire</span>
-          </button>
-          <button id="learn-quiz-btn" type="button" class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-slate-100 dark:bg-obsidian-900 dark:hover:bg-obsidian-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-okapi-blue/25 font-semibold text-sm transition-all cursor-pointer">
-            <i data-lucide="help-circle" class="w-4 h-4"></i>
-            <span>Quiz Rapide</span>
-          </button>
+        <div class="seg">
+          <button id="learn-cards-btn" type="button" class="mode-btn active"><i data-lucide="layers" class="w-4 h-4"></i><span>Cartes mémoire</span></button>
+          <button id="learn-quiz-btn" type="button" class="mode-btn"><i data-lucide="circle-help" class="w-4 h-4"></i><span>Quiz rapide</span></button>
         </div>
       </div>
-
-      <!-- Interactive Learning Arena -->
-      <div id="learn-area" class="glass-panel rounded-2xl p-6 sm:p-10 min-h-[380px] flex flex-col items-center justify-center">
-        <!-- Populated dynamically via JS -->
-      </div>
+      <div id="learn-area" class="glass-panel rounded-3xl p-6 sm:p-10 min-h-[380px] flex flex-col items-center justify-center"></div>
     </section>
 
-    <!-- ==========================================
-         TAB 5: ADMIN & DATASET CURATION
-         ========================================== -->
+    <!-- ============ ADMIN ============ -->
     <section id="tab-admin" class="tab-section hidden space-y-6">
-      <!-- KPI Stat Cards -->
-      <div id="admin-stats" class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <!-- Populated dynamically -->
-      </div>
-
-      <!-- Filter & Export Toolbar -->
-      <div class="glass-panel rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div class="flex items-center gap-3">
-          <label for="admin-status" class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Statut :</label>
-          <select id="admin-status" class="bg-white dark:bg-obsidian-900 border border-slate-300 dark:border-okapi-blue/25 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-800 dark:text-white focus:outline-none focus:border-okapi-blue">
-            <option value="en_attente_admin">En attente de validation (≥10 votes)</option>
-            <option value="collecte">En collecte (&lt; 10 votes)</option>
-            <option value="approuve">Approuvées (Dans le corpus)</option>
-            <option value="rejete">Rejetées</option>
-          </select>
-        </div>
-
-        <button id="admin-export" type="button" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-100 hover:bg-amber-200 dark:bg-okapi-yellow/15 dark:hover:bg-okapi-yellow/25 text-amber-900 dark:text-okapi-yellow border border-amber-300 dark:border-okapi-yellow/35 text-sm font-bold transition-all cursor-pointer">
-          <i data-lucide="download" class="w-4 h-4"></i>
-          <span>Exporter le Dataset (JSONL)</span>
+      <div id="admin-stats" class="grid grid-cols-2 lg:grid-cols-4 gap-4"></div>
+      <div class="glass-panel rounded-3xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <label class="flex items-center gap-3">
+          <span class="eyebrow">Statut</span>
+          <span class="relative">
+            <select id="admin-status" class="select">
+              <option value="en_attente_admin">En attente de validation</option>
+              <option value="collecte">En collecte</option>
+              <option value="approuve">Approuvées (dans le dataset)</option>
+              <option value="rejete">Rejetées</option>
+            </select>
+            <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+          </span>
+        </label>
+        <button id="admin-export" type="button" class="btn px-4 py-2.5 bg-amber-100 hover:bg-amber-200 dark:bg-okapi-yellow/15 dark:hover:bg-okapi-yellow/25 text-amber-900 dark:text-okapi-yellow border border-amber-300/80 dark:border-okapi-yellow/30">
+          <i data-lucide="download" class="w-4 h-4"></i><span>Exporter le dataset (JSONL)</span>
         </button>
       </div>
-
-      <!-- Moderation List -->
-      <div id="admin-list" class="space-y-3">
-        <!-- Populated dynamically -->
-      </div>
+      <div id="admin-list" class="space-y-3"></div>
     </section>
-
   </main>
 
-  <!-- FOOTER -->
-  <footer class="relative z-10 border-t border-slate-200 dark:border-okapi-blue/15 py-6 mt-12 bg-white/70 dark:bg-black/50">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 dark:text-slate-400">
+  <footer class="relative z-10 border-t border-slate-200/70 dark:border-white/[0.06] py-6 mt-10 bg-white/60 dark:bg-ink-950/60 backdrop-blur">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
       <div class="flex items-center gap-2.5">
-        <span class="font-display font-black text-okapi-blue dark:text-okapi-cyan tracking-wide">OKAPI AI</span>
+        <span class="font-display font-black text-okapi-deep dark:text-okapi-cyan tracking-wide">OKAPI AI</span>
         <span class="w-6 h-1 rounded-full drc-swoosh inline-block"></span>
-        <span>Souveraineté numérique et IA des langues nationales de la RDC.</span>
+        <span>L'IA des langues nationales de la RDC.</span>
       </div>
-      <div class="flex items-center gap-4">
+      <div class="flex items-center gap-3">
         <span>Données validées par la communauté</span>
-        <span>•</span>
-        <span id="api-status" class="text-slate-500 flex items-center gap-1.5 font-semibold">
-          <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-          Connexion à l'API…
+        <span aria-hidden="true">•</span>
+        <span id="api-status" class="flex items-center gap-1.5 font-semibold">
+          <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span> Connexion…
         </span>
       </div>
     </div>
   </footer>
 
-  <!-- LOGIN / REGISTER MODAL DIALOG -->
-  <dialog id="login-dialog" class="backdrop:bg-slate-900/60 dark:backdrop:bg-black/85 backdrop:backdrop-blur-sm bg-transparent p-4 w-full max-w-md rounded-2xl">
-    <div class="glass-panel rounded-2xl p-6 sm:p-7 border border-slate-200 dark:border-okapi-blue/30 text-slate-800 dark:text-slate-100">
-      <div class="flex items-center justify-between mb-5">
-        <div class="flex items-center gap-2.5">
-          <div class="w-9 h-9 rounded-xl bg-blue-100 dark:bg-okapi-blue/20 border border-blue-200 dark:border-okapi-blue/40 flex items-center justify-center text-okapi-blue dark:text-okapi-yellow">
-            <i data-lucide="user-check" class="w-5 h-5"></i>
-          </div>
+  <!-- CONNEXION / INSCRIPTION -->
+  <dialog id="login-dialog" class="backdrop:bg-slate-900/50 dark:backdrop:bg-black/80 backdrop:backdrop-blur-sm bg-transparent p-4 w-full max-w-md">
+    <div class="glass-panel !bg-white dark:!bg-ink-900 rounded-3xl p-6 sm:p-7 text-slate-800 dark:text-slate-100">
+      <div class="flex items-start justify-between mb-6">
+        <div class="flex items-center gap-3">
+          <img src="/assets/logo-mark.png" alt="" class="w-11 h-11 object-contain">
           <div>
-            <h2 class="font-display font-bold text-lg text-slate-900 dark:text-white">Espace Contributeur</h2>
-            <p class="text-xs text-slate-500 dark:text-slate-400">Connectez-vous pour contribuer et confirmer les propositions</p>
+            <h2 class="card-title text-lg">Espace contributeur</h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Connectez-vous pour contribuer et confirmer.</p>
           </div>
         </div>
-        <button type="button" id="close-login-btn" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer">
+        <button type="button" id="close-login-btn" aria-label="Fermer" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition cursor-pointer">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
-
       <form id="login-form" class="space-y-4">
-        <div>
-          <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Nom d'utilisateur</label>
-          <input name="username" type="text" placeholder="Ex: KinshasaDev" required minlength="3" class="w-full bg-slate-50 dark:bg-obsidian-950 border border-slate-300 dark:border-okapi-blue/25 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-okapi-blue">
-        </div>
-        <div>
-          <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Mot de passe</label>
-          <input name="password" type="password" placeholder="••••••••" required minlength="6" class="w-full bg-slate-50 dark:bg-obsidian-950 border border-slate-300 dark:border-okapi-blue/25 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-okapi-blue">
-        </div>
-        
+        <label class="block">
+          <span class="eyebrow block mb-1.5">Nom d'utilisateur</span>
+          <input name="username" type="text" placeholder="Ex : KinshasaDev" required minlength="3" autocomplete="username" class="field">
+        </label>
+        <label class="block">
+          <span class="eyebrow block mb-1.5">Mot de passe</span>
+          <input name="password" type="password" placeholder="6 caractères minimum" required minlength="6" autocomplete="current-password" class="field">
+        </label>
         <p id="login-msg" class="text-xs text-okapi-red min-h-[16px]"></p>
-
-        <div class="grid grid-cols-2 gap-3 pt-1">
-          <button type="submit" data-action="login" class="py-2.5 px-4 rounded-xl bg-gradient-to-r from-okapi-blue to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold text-sm shadow-md shadow-okapi-blue/25 transition-all cursor-pointer">
-            Se connecter
-          </button>
-          <button type="submit" data-action="register" class="py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-800 dark:text-white border border-slate-300 dark:border-okapi-blue/25 font-semibold text-sm transition-all cursor-pointer">
-            Créer un compte
-          </button>
+        <div class="grid grid-cols-2 gap-3">
+          <button type="submit" data-action="login" class="btn-primary">Se connecter</button>
+          <button type="submit" data-action="register" class="btn-ghost">Créer un compte</button>
         </div>
       </form>
     </div>
   </dialog>
 
-  <!-- APPLICATION : logique reliée à l'API OkapiAI -->
-  <script src="/app.js?v=6"></script>
+  <script src="/app.js?v=7"></script>
 </body>
 </html>

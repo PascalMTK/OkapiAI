@@ -20,14 +20,21 @@ router = APIRouter(prefix="/api/contributions", tags=["contributions"])
 _AUDIO_NAME = re.compile(r"^[0-9a-f]{32}\.(webm|ogg|wav|mp3|m4a)$")
 
 
+_MESSAGES = {
+    "collecte": "Merci ! {n}/{req} personnes soutiennent cette proposition.",
+    "en_attente_admin": "Merci ! {n} personnes l'ont confirmée : elle attend maintenant la validation d'un administrateur.",
+    "approuve": "Merci ! Cette entrée est déjà validée : votre soutien (et votre voix) y sont ajoutés.",
+    "rejete": "Cette proposition a été rejetée par un administrateur.",
+}
+
+
 def _result(db: Session, c: Contribution) -> dict:
     prop = c.proposition
     n = dataset.support_count(db, prop.id)
     return {
         "contribution_id": c.id, "proposition_id": prop.id, "kind": prop.kind, "status": prop.status,
         "support": n, "required": MIN_SIMILAR,
-        "message": (f"Merci ! {n}/{MIN_SIMILAR} personnes ont proposé une traduction similaire."
-                    if prop.status == COLLECTE else f"Statut de la proposition : {prop.status}"),
+        "message": _MESSAGES.get(prop.status, "Merci pour votre contribution !").format(n=n, req=MIN_SIMILAR),
     }
 
 

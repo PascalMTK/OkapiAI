@@ -8,6 +8,7 @@ import tempfile
 from pathlib import Path
 
 os.environ["OKAPI_DATA_DIR"] = tempfile.mkdtemp(prefix="okapi_test_")
+os.environ["OKAPI_MIN_SIMILAR"] = "10"  # le scénario ci-dessous fait voter 10 personnes
 os.environ["OKAPI_LLM_ENABLED"] = "0"  # jamais d'appel réseau pendant les tests
 os.environ["OKAPI_ENV_FILE"] = os.path.join(os.environ["OKAPI_DATA_DIR"], "aucun.env")  # pas les vraies clés
 os.environ["OKAPI_MODEL_DIR"] = os.path.join(os.environ["OKAPI_DATA_DIR"], "no-model")
@@ -59,8 +60,8 @@ def test_full_flow():
         assert r.json()["support"] == 9 and r.json()["status"] == "collecte"
 
         pid = r.json()["proposition_id"]
-        # L'admin ne peut pas approuver avant le minimum de 10
-        assert c.post(f"/api/admin/propositions/{pid}/approve", headers=admin).status_code == 400
+        # Avant le seuil, l'admin la voit déjà dans « En collecte »
+        assert pid in [p["id"] for p in c.get("/api/admin/propositions?status=collecte", headers=admin).json()]
 
         # 10e personne confirme via la liste des propositions, une seule fois
         r = c.post(f"/api/contributions/proposals/{pid}/confirm", headers=users[9])
@@ -88,6 +89,13 @@ def test_full_flow():
 
         stats = c.get("/api/admin/stats", headers=admin).json()
         assert stats["dataset_entrainement"] == 1 and stats["dataset_collecte"] == 11
+
+        # Validation anticipée : l'admin peut approuver une proposition encore en collecte
+        early = r.json()["proposition_id"]
+        assert c.post(f"/api/admin/propositions/{early}/approve", headers=admin).status_code == 200
+        assert c.post(f"/api/admin/propositions/{early}/approve", headers=admin).status_code == 400
+        assert c.get("/api/admin/stats", headers=admin).json()["dataset_entrainement"] == 2
+        assert "ai_providers" not in c.get("/api/features").json()
 
         assert c.get("/api/learn/cards?lang=ln").json()[0]["meaning"] == "Bonjour à toi"
         assert "Mbote na yo" in c.get("/api/admin/export/entrainement.jsonl", headers=admin).text

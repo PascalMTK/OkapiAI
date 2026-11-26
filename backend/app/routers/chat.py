@@ -185,7 +185,7 @@ def _with_hint(res: dict) -> dict:
         res["hint"] = ("Je ne sais pas encore répondre à ce message dans cette langue. "
                        "Apprenez-moi : écrivez la réponse qu'une personne donnerait !")
     elif res["method"] == "ia":
-        res["hint"] = "Réponse générée par l'IA : elle peut contenir des erreurs. Corrigez-la si besoin !"
+        res["hint"] = "Réponse d'OkapiAI : elle peut contenir des erreurs. Corrigez-la si besoin !"
     return res
 
 

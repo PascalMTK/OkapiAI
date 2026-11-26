@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import inspect, select, text
 from sqlalchemy.orm import Session
 
-from .config import ADMIN_PASSWORD, ADMIN_USERNAME, AUDIO_DIR, FRONTEND_DIR
+from .config import ADMIN_PASSWORD, ADMIN_USERNAME, AUDIO_DIR, FRONTEND_DIR, MIN_SIMILAR
 from .database import Base, SessionLocal, engine, get_db
 from .models import Contribution, TrainingEntry, User
 from .routers import admin, auth, chat, contributions, learn
@@ -130,7 +130,7 @@ async def revalidate_frontend(request, call_next):
 
 @app.get("/api/features")
 def features():
-    return {"ai_conversation": claude_chat.enabled(), "ai_providers": claude_chat.names(),
+    return {"ai_conversation": claude_chat.enabled(), "min_similar": MIN_SIMILAR,
             "speech_recognition": [c for c in ("fr", "ln", "sw") if recognizer.supports(c)]}
 
 

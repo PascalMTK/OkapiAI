@@ -43,7 +43,7 @@ async function api(path, { method = "GET", json, form, signal } = {}) {
 function showToast(message, type = "info") {
   const colors = {
     success: "border-emerald-300 dark:border-emerald-500/40 bg-emerald-50/95 dark:bg-emerald-950/95 text-emerald-900 dark:text-emerald-200",
-    info: "border-blue-300 dark:border-okapi-blue/50 bg-white/95 dark:bg-obsidian-900/95 text-slate-800 dark:text-slate-100",
+    info: "border-blue-300 dark:border-okapi-blue/50 bg-white/95 dark:bg-ink-900/95 text-slate-800 dark:text-slate-100",
     error: "border-rose-300 dark:border-okapi-red/50 bg-rose-50/95 dark:bg-rose-950/95 text-rose-900 dark:text-rose-200",
   };
   const icon = { success: "check-circle-2", info: "sparkles", error: "alert-circle" }[type] || "sparkles";
@@ -209,7 +209,7 @@ const prefGet = (k) => { try { return localStorage.getItem(k); } catch { return 
 const prefSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* sans importance */ } };
 function fillLangSelects() {
   const options = (filter) => state.langs.filter(filter)
-    .map((l) => `<option value="${l.code}" class="bg-white dark:bg-obsidian-900 text-slate-900 dark:text-white">${esc(l.name)}</option>`).join("");
+    .map((l) => `<option value="${l.code}" class="bg-white dark:bg-ink-900 text-slate-900 dark:text-white">${esc(l.name)}</option>`).join("");
   $$(".lang-select").forEach((s) => (s.innerHTML = options(() => true)));
   $("#learn-lang").innerHTML = options((l) => isCongolese(l.code));
   $("#prop-filter").innerHTML = `<option value="">Toutes</option>` + options((l) => isCongolese(l.code));
@@ -237,7 +237,7 @@ function appendBot(log, html, meta = "") {
   const w = document.createElement("div");
   w.className = "flex items-start gap-3.5 max-w-2xl";
   w.innerHTML = `<div class="w-9 h-9 rounded-xl bg-gradient-to-br from-okapi-blue to-blue-800 flex items-center justify-center text-okapi-yellow font-display font-bold text-xs flex-shrink-0 shadow-sm">AI</div>
-    <div class="b-body min-w-0 bg-white dark:bg-obsidian-800/90 border border-slate-200 dark:border-okapi-blue/20 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-slate-800 dark:text-slate-100 leading-relaxed shadow-sm">
+    <div class="b-body min-w-0 bg-white dark:bg-ink-800/90 border border-slate-200 dark:border-okapi-blue/20 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-slate-800 dark:text-slate-100 leading-relaxed shadow-sm">
       ${meta ? `<span class="inline-block text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-okapi-cyan mb-1">${esc(meta)}</span>` : ""}
       ${html}
     </div>`;
@@ -268,7 +268,7 @@ function bindRecordings(body) {
 
 const audioTag = (url) => (url ? `<audio controls preload="none" src="${esc(url)}" class="mt-2 h-8 w-full max-w-xs"></audio>` : "");
 const smallBtn = "inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-okapi-blue/15 dark:hover:bg-okapi-blue/25 text-blue-800 dark:text-okapi-cyan border border-blue-200 dark:border-okapi-blue/30 text-xs font-bold transition-colors cursor-pointer";
-const inputCls = "w-full bg-slate-50 dark:bg-obsidian-950 border border-slate-300 dark:border-okapi-blue/25 focus:border-okapi-blue rounded-lg px-3 py-1.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none";
+const inputCls = "w-full bg-slate-50 dark:bg-ink-950 border border-slate-300 dark:border-okapi-blue/25 focus:border-okapi-blue rounded-lg px-3 py-1.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none";
 
 // Fait parler OkapiAI. Priorité : enregistrement validé > voix OkapiAI (serveur, langues
 // nationales) > voix du navigateur (français / swahili). Résout quand la lecture est finie.
@@ -341,9 +341,6 @@ function playUrl(url) {
     a.play().catch(() => resolve());
   });
 }
-// URL de la voix OkapiAI pour une phrase, si le serveur a une voix dans cette langue
-const ttsFor = (text, lang) => (text && state.voiceCaps?.tts?.includes(lang)
-  ? `/api/tts?lang=${encodeURIComponent(lang)}&text=${encodeURIComponent(text.slice(0, 600))}` : null);
 
 function speak(text, lang, ttsUrl, speech) {
   stopSpeaking();
@@ -355,6 +352,25 @@ function speak(text, lang, ttsUrl, speech) {
 function translationMeta(r) {
   const m = { dataset: "Dataset validé", modele: "Modèle IA", mot_a_mot: "Mot à mot (partiel)" }[r.method];
   return m ? `${m}${r.confidence ? ` • ${Math.round(r.confidence * 100)} %` : ""}` : "";
+}
+
+// Traduction : seulement le texte traduit, sans voix de synthèse. Un bouton « Écouter » n'apparaît
+// que si un vrai enregistrement existe dans le dataset (phrase entière ou mots isolés).
+function renderTranslation(log, r) {
+  if (!r.translation) {
+    bindRecordings(appendBot(log, `<p>🤔 ${esc(r.reply)}</p>${recordingsBlock(r.recordings)}`));
+    return;
+  }
+  const play = (url, label) => `<button type="button" class="b-rec ${smallBtn}" data-url="${esc(url)}">
+      <i data-lucide="volume-2" class="w-3.5 h-3.5"></i>${label}</button>`;
+  const wordAudio = (r.words || []).filter((w) => w.audio_url);
+  const html = `<p class="text-lg font-semibold text-slate-900 dark:text-white">${esc(r.translation)}</p>
+    ${r.method === "mot_a_mot" ? `<p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Traduction partielle : les mots entre [ ] sont encore inconnus.</p>` : ""}
+    ${r.audio_url || wordAudio.length ? `<div class="mt-2.5 flex flex-wrap gap-2">
+      ${r.audio_url ? play(r.audio_url, "Écouter l'enregistrement") : ""}
+      ${wordAudio.map((w) => play(w.audio_url, esc(w.traduction))).join("")}</div>` : ""}
+    ${recordingsBlock(r.recordings)}`;
+  bindRecordings(appendBot(log, html, [langName(r.target_lang), translationMeta(r)].filter(Boolean).join(" · ")));
 }
 
 // ---------- Conversation ----------
@@ -456,8 +472,7 @@ function initChat() {
     if (converse) return sendConverse(log, src.value, text, "chat");
     try {
       const r = await api("/api/chat", { method: "POST", json: { text, source_lang: src.value, target_lang: tgt.value } });
-      bindRecordings(appendBot(log, `<p>${esc(r.reply)}</p>${audioTag(r.audio_url)}${recordingsBlock(r.recordings)}`, translationMeta(r)));
-      if (r.translation) speak(r.translation, r.target_lang, r.audio_url ? null : ttsFor(r.translation, r.target_lang));
+      renderTranslation(log, r);
     } catch (err) { appendBot(log, `<p>⚠️ ${esc(err.message)}</p>`); }
   });
 }
@@ -560,7 +575,7 @@ function liveLog(who, text, fr, lang, note) {
   row.className = who === "user" ? "text-right" : "";
   row.innerHTML = `<span class="inline-block max-w-[85%] px-3 py-2 rounded-xl ${who === "user"
       ? "bg-gradient-to-br from-okapi-blue to-blue-700 text-white"
-      : "bg-slate-100 dark:bg-obsidian-800 text-slate-800 dark:text-slate-100"}">${esc(text)}
+      : "bg-slate-100 dark:bg-ink-800 text-slate-800 dark:text-slate-100"}">${esc(text)}
     ${fr ? `<span class="block text-[11px] opacity-70 italic mt-0.5">${esc(fr)}</span>` : ""}
     ${lang || note ? `<span class="block text-[10px] opacity-60 mt-0.5">${esc([lang && langName(lang), note].filter(Boolean).join(" · "))}</span>` : ""}</span>`;
   $("#live-history").appendChild(row);
@@ -856,7 +871,7 @@ function liveFillLangs() {
   if ((caps.auto_detect || []).length > 1) opts.push(["auto", "🌍 Détection automatique"]);
   for (const l of state.langs.filter((x) => isCongolese(x.code) && caps.asr.includes(x.code))) opts.push([l.code, l.name]);
   $("#live-lang").innerHTML = opts.map(([v, n]) =>
-    `<option value="${v}" class="bg-white dark:bg-obsidian-900 text-slate-900 dark:text-white">${esc(n)}</option>`).join("");
+    `<option value="${v}" class="bg-white dark:bg-ink-900 text-slate-900 dark:text-white">${esc(n)}</option>`).join("");
   // Langue choisie la dernière fois, sinon le lingala (la détection automatique reste proposée)
   const saved = prefGet("okapi.liveLang");
   const pick = [saved, "ln", opts[0]?.[0]].find((v) => v && opts.some(([o]) => o === v));
@@ -901,7 +916,7 @@ const statusBadge = (s) => {
     : "bg-amber-100 dark:bg-amber-500/15 text-amber-800 dark:text-amber-400";
   return `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold whitespace-nowrap ${cls}">${STATUS_LABEL[s] || esc(s)}</span>`;
 };
-const progressBar = (n, req) => `<div class="w-full h-1.5 rounded-full bg-slate-200 dark:bg-obsidian-950 overflow-hidden">
+const progressBar = (n, req) => `<div class="w-full h-1.5 rounded-full bg-slate-200 dark:bg-ink-950 overflow-hidden">
   <div class="h-full drc-swoosh rounded-full transition-all" style="width:${Math.min(100, Math.round((n / req) * 100))}%"></div></div>`;
 const pairLabel = (p) => p.kind === "dialogue" ? `💬 Dialogue · ${langName(p.source_lang)}` : `${langName(p.source_lang)} → ${langName(p.target_lang)}`;
 
@@ -967,7 +982,7 @@ async function loadProposals() {
   try {
     const list = await api(`/api/contributions/proposals${lang ? `?lang=${lang}` : ""}`);
     el.innerHTML = list.length ? list.map((p) => `
-      <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-obsidian-900/80 border border-slate-200 dark:border-okapi-blue/15 space-y-2.5">
+      <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-ink-900/80 border border-slate-200 dark:border-okapi-blue/15 space-y-2.5">
         <div class="flex items-center justify-between gap-2">
           <span class="text-[11px] font-bold text-blue-700 dark:text-okapi-cyan">${esc(pairLabel(p))}</span>
           <span class="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">${p.support}/${p.required} personnes</span>
@@ -1007,7 +1022,7 @@ async function loadMine() {
     const list = await api("/api/contributions/mine");
     $("#mine-count").textContent = list.length;
     el.innerHTML = list.length ? list.map((c) => `
-      <div class="p-3 rounded-xl bg-slate-50 dark:bg-obsidian-900/60 border border-slate-200 dark:border-white/5 flex items-center justify-between gap-3 text-xs">
+      <div class="p-3 rounded-xl bg-slate-50 dark:bg-ink-900/60 border border-slate-200 dark:border-white/5 flex items-center justify-between gap-3 text-xs">
         <div class="min-w-0">
           <p class="text-slate-800 dark:text-slate-200 font-semibold truncate">${c.type === "dialogue" ? "💬 " : ""}${c.kind === "voix" ? "🎙️ " : ""}${esc(c.source_text)}</p>
           <p class="text-slate-500 truncate">${esc(c.target_text)}</p>
@@ -1031,7 +1046,7 @@ const emptyLearn = (lang) => `<div class="text-center max-w-md space-y-3">
 </div>`;
 
 function setLearnButtons(mode) {
-  const on = ["bg-okapi-blue", "text-white", "shadow-md"], off = ["bg-white", "dark:bg-obsidian-900", "text-slate-700", "dark:text-slate-200"];
+  const on = ["bg-okapi-blue", "text-white", "shadow-md"], off = ["bg-white", "dark:bg-ink-900", "text-slate-700", "dark:text-slate-200"];
   const [a, b] = mode === "cards" ? [$("#learn-cards-btn"), $("#learn-quiz-btn")] : [$("#learn-quiz-btn"), $("#learn-cards-btn")];
   on.forEach((c) => { a.classList.add(c); b.classList.remove(c); });
   off.forEach((c) => { a.classList.remove(c); b.classList.add(c); });
@@ -1055,7 +1070,7 @@ function renderCard() {
       <span>Carte ${learnState.index + 1} sur ${cards.length}</span>
       <span class="text-amber-600 dark:text-amber-400">Cliquez sur la carte pour la retourner</span>
     </div>
-    <div id="flashcard" class="cursor-pointer relative w-full min-h-56 rounded-2xl bg-gradient-to-br from-white via-blue-50/70 to-sky-100/80 dark:from-obsidian-800 dark:to-obsidian-950 border-2 border-blue-200 dark:border-okapi-blue/30 hover:border-okapi-blue dark:hover:border-okapi-yellow/60 p-6 flex flex-col items-center justify-center shadow-lg transition-all duration-300">
+    <div id="flashcard" class="cursor-pointer relative w-full min-h-56 rounded-2xl bg-gradient-to-br from-white via-blue-50/70 to-sky-100/80 dark:from-ink-800 dark:to-ink-950 border-2 border-blue-200 dark:border-okapi-blue/30 hover:border-okapi-blue dark:hover:border-okapi-yellow/60 p-6 flex flex-col items-center justify-center shadow-lg transition-all duration-300">
       <span class="text-[11px] uppercase tracking-widest font-extrabold text-amber-600 dark:text-okapi-yellow mb-3">${esc(langName(flipped ? c.meaning_lang : c.lang))}</span>
       <p class="font-display font-bold text-xl sm:text-2xl text-slate-900 dark:text-white">${esc(flipped ? c.meaning : c.text)}</p>
     </div>
@@ -1085,13 +1100,13 @@ async function showQuiz() {
       <span class="text-slate-500 dark:text-slate-400">Quiz ${esc(langName(lang))} • Question ${learnState.step + 1}</span>
       <span class="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">Score : ${learnState.score} / ${learnState.step}</span>
     </div>
-    <div class="p-6 rounded-2xl bg-blue-50/70 dark:bg-obsidian-900/90 border border-blue-200 dark:border-okapi-blue/25 text-center">
+    <div class="p-6 rounded-2xl bg-blue-50/70 dark:bg-ink-900/90 border border-blue-200 dark:border-okapi-blue/25 text-center">
       <p class="text-xs text-slate-500 dark:text-slate-400 mb-2 font-medium">Que signifie cette expression ?</p>
       <h3 class="font-display font-bold text-xl sm:text-2xl text-blue-800 dark:text-okapi-yellow">« ${esc(q.question)} »</h3>
       ${q.audio_url ? `<audio controls preload="none" src="${esc(q.audio_url)}" class="mx-auto mt-3 h-9"></audio>` : ""}
     </div>
     <div class="space-y-2.5">${q.choices.map((c, i) => `
-      <button type="button" data-i="${i}" class="quiz-opt w-full text-left p-4 rounded-xl bg-white hover:bg-blue-50 dark:bg-obsidian-900 dark:hover:bg-obsidian-800 border border-slate-200 dark:border-okapi-blue/20 hover:border-okapi-blue text-sm font-semibold text-slate-800 dark:text-slate-200 transition-all cursor-pointer shadow-2xs">${esc(c)}</button>`).join("")}
+      <button type="button" data-i="${i}" class="quiz-opt w-full text-left p-4 rounded-xl bg-white hover:bg-blue-50 dark:bg-ink-900 dark:hover:bg-ink-800 border border-slate-200 dark:border-okapi-blue/20 hover:border-okapi-blue text-sm font-semibold text-slate-800 dark:text-slate-200 transition-all cursor-pointer shadow-2xs">${esc(c)}</button>`).join("")}
     </div>
   </div>`;
   $$(".quiz-opt", area).forEach((btn) => btn.addEventListener("click", () => {
@@ -1156,7 +1171,7 @@ async function renderAdmin() {
   const status = $("#admin-status").value;
   const list = await api(`/api/admin/propositions?status=${status}`);
   const pending = status === "en_attente_admin";
-  const field = "w-full bg-white dark:bg-obsidian-900 border border-slate-300 dark:border-okapi-blue/25 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-okapi-blue";
+  const field = "w-full bg-white dark:bg-ink-900 border border-slate-300 dark:border-okapi-blue/25 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-okapi-blue";
   $("#admin-list").innerHTML = list.length ? list.map((p) => `
     <div class="${adminCard} space-y-3" data-pid="${p.id}">
       <div class="flex flex-wrap items-center justify-between gap-2">
@@ -1239,10 +1254,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   api("/api/features").then((f) => {
     state.features = f;
-    const via = (f.ai_providers || []).join(" + ");
-    $("#ai-badge-text").textContent = f.ai_conversation ? `IA active${via ? ` (${via})` : ""}` : "Réponses du dataset";
-    $("#ai-badge").title = f.ai_conversation ? `Conversation libre avec l'IA (${via}), ancrée sur le dataset validé`
-      : "L'IA n'est pas activée sur le serveur : le bot répond avec les dialogues validés par la communauté";
+    $("#ai-badge-text").textContent = f.ai_conversation ? "IA active" : "Réponses du dataset";
+    $("#ai-badge").title = f.ai_conversation ? "Conversation libre avec OkapiAI, ancrée sur le dataset validé"
+      : "Le bot répond avec les dialogues validés par la communauté";
   }).catch(() => {});
 
   const afterSession = () => { if (onAdminUrl()) openAdminFromUrl(); else activateTab("chat"); };
