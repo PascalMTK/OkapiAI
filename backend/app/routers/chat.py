@@ -15,6 +15,7 @@ from ..services.audio import save_audio
 from ..services import recordings
 from ..services.corpus import corpus, corpus_lua_voice
 from ..services.hearing import for_lang as hearing_for
+from ..services.lexicon import lexicon
 from ..services.speech import recognizer
 from ..services.tts import MAX_CHARS, display_text, synthesizer
 
@@ -133,6 +134,11 @@ def chat(body: TranslateIn, db: Session = Depends(get_db)):
         if t["reply"]:
             res.update(translation=t["reply"], method=t["method"], audio_url=t["audio_url"],
                        confidence=None, words=[], alternatives=t["alternatives"], pron=t["pron"])
+    elif body.source_lang == "ln" and body.target_lang == "fr" and res["method"] in (None, "mot_a_mot"):
+        # lingala -> français : un mot connu du dictionnaire (« mbote » -> salut, bonjour)
+        meanings = lexicon.describe(lexicon.lookup(body.text.strip(" ?!."), fuzzy=False)[1])
+        if meanings:
+            res.update(translation=meanings[0]["sens"], method="lexique", confidence=None, words=[])
     if res["method"] in ("lexique", "ia"):
         reply = f"En {tgt} : « {res['translation']} »"
     elif res["method"] == "dataset":

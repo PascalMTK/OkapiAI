@@ -244,6 +244,10 @@ def test_word_meaning():
             assert r["kind"] == "traduction" and r["reply"] == want, r
         r = ask("mbote")   # du lingala : on converse
         assert r.get("kind") != "traduction", r
+        # swahili, kikongo (sans vocabulaire) : seuls des mots français connus déclenchent la traduction
+        from app.services.conversation import looks_french
+        assert not looks_french("sw", "habari yako") and not looks_french("kg", "mbote")
+        assert looks_french("sw", "je vais au marché") and looks_french("kg", "merci")
         r = ask("ndako na lingala ezali nini ?")  # déjà du lingala : on donne son sens
         assert r["method"] == "lexique" and "maison" in r["reply"], r
 
@@ -479,7 +483,29 @@ def test_gpu_released_during_training():
         flag.unlink()
 
 
+def test_learning_games():
+    """Quiz rapide et jeu de mémoire : toutes les langues, même sans phrase validée."""
+    with TestClient(app) as c:
+        for lang in ("ln", "sw", "kg", "lua"):
+            themes = c.get(f"/api/learn/themes?lang={lang}").json()
+            assert themes and all(t["count"] >= 4 for t in themes), (lang, themes)
+            q = c.get(f"/api/learn/quick-quiz?lang={lang}&n=10").json()["questions"]
+            assert len(q) == 10 and {x["kind"] for x in q} == {"traduire", "sens", "ecoute"}
+            for x in q:
+                assert x["answer"] in x["choices"] and len(set(x["choices"])) == 4, x
+                assert x["tts_url"].startswith(f"/api/tts?lang={lang}&")
+            m = c.get(f"/api/learn/memory?lang={lang}&pairs=6&theme={themes[0]['theme']}").json()["pairs"]
+            assert len(m) == 6 and len({p["word"] for p in m}) == 6 and len({p["fr"] for p in m}) == 6
+            cards = c.get(f"/api/learn/cards?lang={lang}&limit=5").json()
+            assert len(cards) == 5
+        r = c.get("/api/learn/quick-quiz?lang=ln&theme=Nombres").json()["questions"]
+        assert all(x["theme"] == "Nombres" for x in r)
+        assert c.get("/api/learn/quick-quiz?lang=fr").status_code == 400
+        assert c.get("/api/learn/memory?lang=ln&theme=inexistant").status_code == 404
+
+
 if __name__ == "__main__":
+    test_learning_games()
     test_gpu_released_during_training()
     test_phrase_translation_and_voices()
     test_learner_hearing()

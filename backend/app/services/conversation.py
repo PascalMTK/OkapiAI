@@ -138,6 +138,19 @@ def _tokens(message: str) -> list[str]:
     return [_ELISION.sub("", w) for w in key(re.sub(r"[?!.,;:«»\"“”()]", " ", message.replace("’", "'"))).split()]
 
 
+_DICT_FR: Optional[set[str]] = None
+
+
+def _dictionary_french() -> set[str]:
+    """Mots français du dictionnaire (gloses du Wiktionnaire), sans ceux qui sont aussi lingala."""
+    global _DICT_FR
+    if _DICT_FR is None:
+        lexicon._load()
+        _DICT_FR = ({w for f in list(lexicon._fr) + list(COMMON_FR) for w in key(f).split() if len(w) > 2}
+                    - {w for k in lexicon._ln for w in k.split()})
+    return _DICT_FR
+
+
 def looks_french(lang: str, message: str) -> bool:
     """Le message est-il écrit en français (et non dans la langue de la conversation) ?"""
     from .hearing import for_lang
@@ -148,7 +161,10 @@ def looks_french(lang: str, message: str) -> bool:
     if h is not None:
         h._load()
     national_words = h._freq if h is not None else {}
-    french_words = (h._french if h is not None else set()) | {key(f) for f in COMMON_FR}
+    if h is not None:
+        french_words = h._french | {key(f) for f in COMMON_FR}
+    else:
+        french_words = _dictionary_french()
 
     def national(t):
         if t in _FR_STOP or t in french_words:
@@ -157,6 +173,10 @@ def looks_french(lang: str, message: str) -> bool:
 
     fr = sum(1 for t in toks if t in _FR_STOP or t in french_words)
     nat = sum(1 for t in toks if national(t))
+    if h is None:
+        # swahili, kikongo : pas encore de vocabulaire pour reconnaître la langue, il faut donc
+        # des mots français connus (« habari yako », « mbote » ne doivent pas être traduits)
+        return fr >= max(1, len(toks) / 2)
     if len(toks) <= 2 and nat == 0:
         return True     # un mot qui n'est pas de la langue : « piscine », « rivière »
     return fr > nat and fr >= len(toks) / 2

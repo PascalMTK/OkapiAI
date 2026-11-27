@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OkapiAI — L'IA des langues congolaises</title>
+  <title>OkapiAI, l'IA des langues congolaises</title>
   <meta name="theme-color" content="#f6f7fb">
   <link rel="icon" type="image/png" href="/assets/logo-mark.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -159,7 +159,7 @@
   <!-- EN-TÊTE -->
   <header class="sticky top-0 z-40 bg-white/95 dark:bg-ink-950/95 border-b border-slate-200/70 dark:border-white/[0.06]">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 sm:h-[4.5rem] flex items-center justify-between gap-4">
-      <a href="/" class="flex items-center gap-3 min-w-0" aria-label="OkapiAI — accueil">
+      <a href="/" class="flex items-center gap-3 min-w-0" aria-label="Accueil OkapiAI">
         <img src="/assets/logo-mark.png" alt="" class="brand-mark w-11 h-11 sm:w-12 sm:h-12 object-contain flex-shrink-0">
         <div class="min-w-0">
           <div class="font-display font-black text-lg sm:text-xl tracking-wide leading-none okapi-blue-text">OKAPI AI</div>
@@ -227,7 +227,7 @@
               <img src="/assets/logo-dark.png" alt="OkapiAI" class="w-full h-full object-contain hidden dark:block">
             </div>
             <h1 class="mt-3 font-display font-extrabold text-2xl sm:text-3xl text-slate-900 dark:text-white tracking-tight">Mbote ! Jambo ! Moyo !</h1>
-            <p class="mt-2 text-sm text-slate-500 dark:text-slate-400 max-w-md">Discutez ou traduisez en lingala, swahili, kikongo et tshiluba. Choisissez une langue, puis écrivez — ou essayez un exemple ci-dessous.</p>
+            <p class="mt-2 text-sm text-slate-500 dark:text-slate-400 max-w-md">Discutez ou traduisez en lingala, swahili, kikongo et tshiluba. Choisissez une langue, puis écrivez, ou essayez un exemple ci-dessous.</p>
           </div>
         </div>
 
@@ -383,7 +383,7 @@
                 <button type="button" id="contrib-rec-btn" class="btn-ghost !py-2 !px-3.5">
                   <i data-lucide="mic" class="w-4 h-4 text-okapi-red"></i><span>Enregistrer la prononciation</span>
                 </button>
-                <span id="contrib-rec-status" class="text-xs text-slate-500 dark:text-slate-400">Optionnel — aide à entraîner la voix</span>
+                <span id="contrib-rec-status" class="text-xs text-slate-500 dark:text-slate-400">Optionnel, aide à entraîner la voix</span>
               </div>
               <audio id="contrib-audio" controls class="hidden h-9 max-w-[220px]"></audio>
             </div>
@@ -434,10 +434,17 @@
             <label for="learn-lang" class="eyebrow block">Langue étudiée</label>
             <select id="learn-lang" class="bg-transparent text-slate-900 dark:text-white font-display font-bold text-lg focus:outline-none cursor-pointer -ml-1"></select>
           </div>
+          <div class="pl-3 ml-1 border-l border-slate-200 dark:border-okapi-blue/20">
+            <label for="learn-theme" class="eyebrow block">Thème</label>
+            <select id="learn-theme" class="bg-transparent text-slate-900 dark:text-white font-semibold text-sm focus:outline-none cursor-pointer -ml-1 max-w-[12rem]">
+              <option value="">Tous les thèmes</option>
+            </select>
+          </div>
         </div>
-        <div class="seg">
+        <div class="seg flex-wrap">
           <button id="learn-cards-btn" type="button" class="mode-btn active"><i data-lucide="layers" class="w-4 h-4"></i><span>Cartes mémoire</span></button>
           <button id="learn-quiz-btn" type="button" class="mode-btn"><i data-lucide="circle-help" class="w-4 h-4"></i><span>Quiz rapide</span></button>
+          <button id="learn-memory-btn" type="button" class="mode-btn"><i data-lucide="brain" class="w-4 h-4"></i><span>Jeu de mémoire</span></button>
         </div>
       </div>
       <div id="learn-area" class="glass-panel rounded-3xl p-6 sm:p-10 min-h-[380px] flex flex-col items-center justify-center"></div>

@@ -351,7 +351,7 @@ function speak(text, lang, ttsUrl, speech) {
 // Réponse de traduction
 function translationMeta(r) {
   const m = { dataset: "Dataset validé", modele: "Modèle IA", mot_a_mot: "Mot à mot (partiel)",
-    lexique: "Dictionnaire", ia: "Traduction IA — peut contenir des erreurs" }[r.method];
+    lexique: "Dictionnaire", ia: "Traduction IA, peut contenir des erreurs" }[r.method];
   return m ? `${m}${r.confidence ? ` • ${Math.round(r.confidence * 100)} %` : ""}` : "";
 }
 
@@ -382,15 +382,15 @@ const convHistory = { chat: [], voice: [] };
 function renderAnswer(log, lang, userMsg, a, key) {
   const meta = {
     dataset: "Réponse validée par la communauté",
-    ia: "Réponse IA — peut contenir des erreurs",
+    ia: "Réponse IA, peut contenir des erreurs",
     lexique: "Dictionnaire (Wiktionnaire · Wikipédia)",
-    base: "Phrase de base — corrigez-la si besoin",
-    inconnu: "Mot inconnu — apprenez-le au bot",
+    base: "Phrase de base, corrigez-la si besoin",
+    inconnu: "Mot inconnu, apprenez-le au bot",
   }[a.method] || "";
   const trMeta = {
     dataset: "Traduction validée par la communauté",
     lexique: "Dictionnaire",
-    ia: "Traduction IA — peut contenir des erreurs",
+    ia: "Traduction IA, peut contenir des erreurs",
     modele: "Modèle de traduction",
     mot_a_mot: "Mot à mot (partiel)",
   }[a.method] || "";
@@ -569,7 +569,7 @@ const LIVE_STATUS = {
   listening: "Je vous écoute…",
   thinking: "OkapiAI réfléchit… (vous pouvez continuer à parler)",
   speaking: "OkapiAI parle… parlez quand vous voulez, il s'arrêtera",
-  paused: "En pause — parlez ou touchez l'orbe pour reprendre",
+  paused: "En pause. Parlez ou touchez l'orbe pour reprendre",
 };
 
 function liveSetState(s, text) {
@@ -765,7 +765,7 @@ async function liveSend(pcm) {
   } catch (err) {
     if (err.name === "AbortError" || live.request !== ctrl) return;   // l'utilisateur a repris la parole
     live.request = null; live.carry = null;
-    if (live.on) liveSetState("paused", `⚠️ ${err.message} — parlez ou touchez l'orbe pour réessayer`);
+    if (live.on) liveSetState("paused", `⚠️ ${err.message}. Parlez ou touchez l'orbe pour réessayer`);
   }
 }
 
@@ -1057,28 +1057,48 @@ async function loadMine() {
 }
 tabLoaders.contribute = () => { loadProposals(); loadMine(); };
 
-// ---------- Apprendre ----------
-const learnState = { mode: "cards", cards: [], index: 0, flipped: false, score: 0, step: 0 };
-const emptyLearn = (lang) => `<div class="text-center max-w-md space-y-3">
-  <div class="mx-auto w-12 h-12 rounded-2xl bg-blue-100 dark:bg-okapi-blue/15 flex items-center justify-center text-okapi-blue dark:text-okapi-cyan"><i data-lucide="sprout" class="w-6 h-6"></i></div>
-  <p class="font-display font-bold text-lg text-slate-900 dark:text-white">Pas encore de phrases validées en ${esc(langName(lang))}</p>
-  <p class="text-sm text-slate-600 dark:text-slate-400">Les cartes et les quiz utilisent uniquement les données validées par la communauté et l'admin. Contribuez pour les remplir !</p>
-</div>`;
+// ---------- Apprendre : cartes mémoire, quiz rapide, jeu de mémoire ----------
+// Pas de voix automatique : on écoute en cliquant (phrase validée = voix d'un locuteur, sinon voix d'OkapiAI).
+const learnState = { mode: "cards", cards: [], index: 0, flipped: false };
+const learnLang = () => $("#learn-lang").value;
+const learnTheme = () => $("#learn-theme").value;
+const themeQS = () => (learnTheme() ? `&theme=${encodeURIComponent(learnTheme())}` : "");
+const listenBtn = (url, label = "Écouter", extra = "") => (url
+  ? `<button type="button" class="l-listen ${smallBtn} ${extra}" data-url="${esc(url)}"><i data-lucide="volume-2" class="w-3.5 h-3.5"></i>${label}</button>` : "");
+const bindListen = (root) => $$(".l-listen", root).forEach((b) => (b.onclick = (e) => { e.stopPropagation(); playUrl(b.dataset.url); }));
+const bestKey = (game) => `okapi.best.${game}.${learnLang()}.${learnTheme() || "tous"}`;
+const learnError = (msg) => {
+  $("#learn-area").innerHTML = `<div class="text-center max-w-md space-y-3">
+    <div class="mx-auto w-12 h-12 rounded-2xl bg-blue-100 dark:bg-okapi-blue/15 flex items-center justify-center text-okapi-blue dark:text-okapi-cyan"><i data-lucide="sprout" class="w-6 h-6"></i></div>
+    <p class="font-display font-bold text-lg text-slate-900 dark:text-white">${esc(msg)}</p>
+    <p class="text-sm text-slate-600 dark:text-slate-400">Choisissez un autre thème, ou contribuez pour ajouter des mots !</p></div>`;
+  icons();
+};
+const learnBtn = "px-5 py-2.5 rounded-xl bg-gradient-to-r from-okapi-blue to-blue-600 text-white text-sm font-bold shadow-md shadow-okapi-blue/25 transition-colors cursor-pointer";
+const learnBtn2 = "px-4 py-2.5 rounded-xl bg-white hover:bg-slate-100 dark:bg-white/5 dark:hover:bg-white/10 border border-slate-300 dark:border-okapi-blue/20 text-sm font-semibold text-slate-700 dark:text-slate-200 transition-colors cursor-pointer";
 
-function setLearnButtons(mode) {
-  const on = ["bg-okapi-blue", "text-white", "shadow-md"], off = ["bg-white", "dark:bg-ink-900", "text-slate-700", "dark:text-slate-200"];
-  const [a, b] = mode === "cards" ? [$("#learn-cards-btn"), $("#learn-quiz-btn")] : [$("#learn-quiz-btn"), $("#learn-cards-btn")];
-  on.forEach((c) => { a.classList.add(c); b.classList.remove(c); });
-  off.forEach((c) => { a.classList.remove(c); b.classList.add(c); });
+function setLearnMode(mode) {
+  learnState.mode = mode;
+  [["cards", "#learn-cards-btn"], ["quiz", "#learn-quiz-btn"], ["memory", "#learn-memory-btn"]]
+    .forEach(([m, sel]) => $(sel).classList.toggle("active", m === mode));
 }
 
+async function loadThemes() {
+  const sel = $("#learn-theme"), keep = sel.value;
+  let list = [];
+  try { list = await api(`/api/learn/themes?lang=${learnLang()}`); } catch { /* thèmes indisponibles : « Tous » */ }
+  sel.innerHTML = `<option value="">Tous les thèmes</option>` +
+    list.map((t) => `<option value="${esc(t.theme)}">${esc(t.theme)} (${t.count})</option>`).join("");
+  if (list.some((t) => t.theme === keep)) sel.value = keep;
+}
+
+// ----- Cartes mémoire -----
 async function showCards() {
-  learnState.mode = "cards"; setLearnButtons("cards");
-  const area = $("#learn-area"), lang = $("#learn-lang").value;
-  try { learnState.cards = await api(`/api/learn/cards?lang=${lang}&limit=20`); }
-  catch (err) { area.innerHTML = `<p class="text-okapi-red text-sm">⚠️ ${esc(err.message)}</p>`; return; }
+  setLearnMode("cards");
+  try { learnState.cards = await api(`/api/learn/cards?lang=${learnLang()}&limit=20${themeQS()}`); }
+  catch (err) { return learnError(err.message); }
   learnState.index = 0; learnState.flipped = false;
-  if (!learnState.cards.length) { area.innerHTML = emptyLearn(lang); icons(); return; }
+  if (!learnState.cards.length) return learnError(`Pas encore de mots en ${langName(learnLang())}`);
   renderCard();
 }
 
@@ -1093,57 +1113,240 @@ function renderCard() {
     <div id="flashcard" class="cursor-pointer relative w-full min-h-56 rounded-2xl bg-gradient-to-br from-white via-blue-50/70 to-sky-100/80 dark:from-ink-800 dark:to-ink-950 border-2 border-blue-200 dark:border-okapi-blue/30 hover:border-okapi-blue dark:hover:border-okapi-yellow/60 p-6 flex flex-col items-center justify-center shadow-lg transition-all duration-300">
       <span class="text-[11px] uppercase tracking-widest font-extrabold text-amber-600 dark:text-okapi-yellow mb-3">${esc(langName(flipped ? c.meaning_lang : c.lang))}</span>
       <p class="font-display font-bold text-xl sm:text-2xl text-slate-900 dark:text-white">${esc(flipped ? c.meaning : c.text)}</p>
+      ${c.source ? `<span class="mt-3 text-[10px] text-slate-400">${esc(c.source)}</span>` : ""}
     </div>
-    ${c.audio_url ? `<audio controls preload="none" src="${esc(c.audio_url)}" class="mx-auto h-9"></audio>` : ""}
+    <div>${listenBtn(c.audio_url || c.tts_url, c.audio_url ? "Écouter (voix d'un locuteur)" : "Écouter la prononciation")}</div>
     <div class="flex items-center justify-center gap-3">
-      <button type="button" id="prev-card" class="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-100 dark:bg-white/5 dark:hover:bg-white/10 border border-slate-300 dark:border-okapi-blue/20 text-sm font-semibold text-slate-700 dark:text-slate-200 transition-colors cursor-pointer">← Précédente</button>
-      <button type="button" id="next-card" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-okapi-blue to-blue-600 text-white text-sm font-bold shadow-md shadow-okapi-blue/25 transition-colors cursor-pointer">Suivante →</button>
+      <button type="button" id="prev-card" class="${learnBtn2}">← Précédente</button>
+      <button type="button" id="next-card" class="${learnBtn}">Suivante →</button>
     </div>
   </div>`;
-  $("#flashcard").onclick = () => {
-    learnState.flipped = !learnState.flipped;
-    if (learnState.flipped) speak(c.meaning, c.meaning_lang);
-    renderCard();
-  };
+  icons(); bindListen(area);
+  $("#flashcard").onclick = () => { learnState.flipped = !learnState.flipped; renderCard(); };
   $("#prev-card").onclick = () => { learnState.index = (learnState.index - 1 + cards.length) % cards.length; learnState.flipped = false; renderCard(); };
   $("#next-card").onclick = () => { learnState.index = (learnState.index + 1) % cards.length; learnState.flipped = false; renderCard(); };
 }
 
-async function showQuiz() {
-  learnState.mode = "quiz"; setLearnButtons("quiz");
-  const area = $("#learn-area"), lang = $("#learn-lang").value;
-  let q;
-  try { q = await api(`/api/learn/quiz?lang=${lang}`); }
-  catch { area.innerHTML = emptyLearn(lang).replace("Pas encore de phrases validées", "Pas assez de phrases validées pour un quiz"); icons(); return; }
-  area.innerHTML = `<div class="w-full max-w-lg space-y-6">
+// ----- Quiz rapide -----
+const quiz = { questions: [], i: 0, score: 0, streak: 0, bestStreak: 0, mistakes: [] };
+
+function showQuizStart() {
+  setLearnMode("quiz");
+  const best = prefGet(bestKey("quiz"));
+  $("#learn-area").innerHTML = `<div class="w-full max-w-md text-center space-y-5">
+    <div class="mx-auto w-14 h-14 rounded-2xl bg-amber-100 dark:bg-okapi-yellow/15 flex items-center justify-center text-amber-700 dark:text-okapi-yellow"><i data-lucide="zap" class="w-7 h-7"></i></div>
+    <div>
+      <p class="font-display font-bold text-2xl text-slate-900 dark:text-white">Quiz rapide · ${esc(langName(learnLang()))}</p>
+      <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">10 questions : traduire un mot, trouver son sens, et reconnaître un mot <b>à l'oreille</b>.</p>
+      <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Thème : ${esc(learnTheme() || "tous les thèmes")}${best ? ` · Meilleur score : ${esc(best)}/10` : ""}</p>
+    </div>
+    <button type="button" id="quiz-start" class="${learnBtn} text-base px-7 py-3">Commencer</button>
+  </div>`;
+  icons();
+  $("#quiz-start").onclick = startQuiz;
+}
+
+async function startQuiz() {
+  let r;
+  try { r = await api(`/api/learn/quick-quiz?lang=${learnLang()}&n=10${themeQS()}`); }
+  catch (err) { return learnError(err.message); }
+  Object.assign(quiz, { questions: r.questions, i: 0, score: 0, streak: 0, bestStreak: 0, mistakes: [] });
+  renderQuestion();
+}
+
+function renderQuestion() {
+  const q = quiz.questions[quiz.i], n = quiz.questions.length, lang = langName(learnLang());
+  const title = {
+    traduire: `Comment dit-on <span class="text-blue-800 dark:text-okapi-yellow">« ${esc(q.prompt)} »</span> en ${esc(lang.toLowerCase())} ?`,
+    sens: `Que veut dire <span class="text-blue-800 dark:text-okapi-yellow">« ${esc(q.prompt)} »</span> ?`,
+    ecoute: "Écoutez, puis trouvez le sens",
+  }[q.kind];
+  const audio = q.audio_url || q.tts_url;
+  $("#learn-area").innerHTML = `<div class="w-full max-w-lg space-y-5">
     <div class="flex items-center justify-between text-xs font-bold">
-      <span class="text-slate-500 dark:text-slate-400">Quiz ${esc(langName(lang))} • Question ${learnState.step + 1}</span>
-      <span class="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">Score : ${learnState.score} / ${learnState.step}</span>
+      <span class="text-slate-500 dark:text-slate-400">Question ${quiz.i + 1} / ${n}</span>
+      <span class="flex gap-2">
+        ${quiz.streak >= 2 ? `<span class="px-2.5 py-1 rounded-full bg-amber-100 dark:bg-okapi-yellow/15 text-amber-700 dark:text-okapi-yellow">🔥 ${quiz.streak} d'affilée</span>` : ""}
+        <span class="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">Score : ${quiz.score}</span>
+      </span>
     </div>
-    <div class="p-6 rounded-2xl bg-blue-50/70 dark:bg-ink-900/90 border border-blue-200 dark:border-okapi-blue/25 text-center">
-      <p class="text-xs text-slate-500 dark:text-slate-400 mb-2 font-medium">Que signifie cette expression ?</p>
-      <h3 class="font-display font-bold text-xl sm:text-2xl text-blue-800 dark:text-okapi-yellow">« ${esc(q.question)} »</h3>
-      ${q.audio_url ? `<audio controls preload="none" src="${esc(q.audio_url)}" class="mx-auto mt-3 h-9"></audio>` : ""}
+    <div class="h-1.5 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden"><div class="h-full bg-okapi-blue dark:bg-okapi-yellow transition-all" style="width:${(quiz.i / n) * 100}%"></div></div>
+    <div class="p-6 rounded-2xl bg-blue-50/70 dark:bg-ink-900/90 border border-blue-200 dark:border-okapi-blue/25 text-center space-y-3">
+      <h3 class="font-display font-bold text-xl text-slate-900 dark:text-white">${title}</h3>
+      ${q.kind === "ecoute"
+        ? `<button type="button" class="l-listen mx-auto w-16 h-16 rounded-full bg-okapi-blue hover:bg-blue-700 text-white flex items-center justify-center shadow-lg cursor-pointer" data-url="${esc(audio)}" title="Écouter"><i data-lucide="volume-2" class="w-7 h-7"></i></button>
+           <p class="text-xs text-slate-500 dark:text-slate-400">Cliquez pour écouter, autant de fois que vous voulez</p>`
+        : q.kind === "sens" ? listenBtn(audio) : ""}
     </div>
-    <div class="space-y-2.5">${q.choices.map((c, i) => `
-      <button type="button" data-i="${i}" class="quiz-opt w-full text-left p-4 rounded-xl bg-white hover:bg-blue-50 dark:bg-ink-900 dark:hover:bg-ink-800 border border-slate-200 dark:border-okapi-blue/20 hover:border-okapi-blue text-sm font-semibold text-slate-800 dark:text-slate-200 transition-all cursor-pointer shadow-2xs">${esc(c)}</button>`).join("")}
+    <div class="grid sm:grid-cols-2 gap-2.5">${q.choices.map((c, i) => `
+      <button type="button" data-i="${i}" class="quiz-opt w-full text-left p-4 rounded-xl bg-white hover:bg-blue-50 dark:bg-ink-900 dark:hover:bg-ink-800 border border-slate-200 dark:border-okapi-blue/20 hover:border-okapi-blue text-sm font-semibold text-slate-800 dark:text-slate-200 transition-all cursor-pointer"><span class="text-slate-400 mr-2">${i + 1}</span>${esc(c)}</button>`).join("")}
+    </div>
+    <div id="quiz-feedback"></div>
+  </div>`;
+  icons(); bindListen($("#learn-area"));
+  $$(".quiz-opt").forEach((btn) => (btn.onclick = () => answerQuestion(btn)));
+}
+
+function answerQuestion(btn) {
+  const q = quiz.questions[quiz.i], ok = q.choices[btn.dataset.i] === q.answer;
+  $$(".quiz-opt").forEach((b) => {
+    b.disabled = true; b.classList.remove("hover:bg-blue-50", "dark:hover:bg-ink-800", "cursor-pointer");
+    if (q.choices[b.dataset.i] === q.answer) b.classList.add("!bg-emerald-100", "dark:!bg-emerald-500/20", "!border-emerald-500");
+  });
+  if (ok) { quiz.score += 1; quiz.streak += 1; quiz.bestStreak = Math.max(quiz.bestStreak, quiz.streak); }
+  else { quiz.streak = 0; quiz.mistakes.push(q); btn.classList.add("!bg-rose-100", "dark:!bg-rose-500/20", "!border-rose-500"); }
+  const last = quiz.i + 1 >= quiz.questions.length;
+  $("#quiz-feedback").innerHTML = `<div class="p-4 rounded-xl ${ok ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30" : "bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/30"} border flex flex-wrap items-center justify-between gap-3">
+      <div class="text-sm">
+        <p class="font-bold ${ok ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400"}">${ok ? "Bonne réponse !" : "Pas tout à fait."}</p>
+        <p class="text-slate-700 dark:text-slate-200"><b>${esc(q.word)}</b> = ${esc(q.fr)}</p>
+        <p class="text-[10px] text-slate-400">${esc(q.source)}</p>
+      </div>
+      <div class="flex gap-2">${listenBtn(q.audio_url || q.tts_url)}<button type="button" id="quiz-next" class="${learnBtn}">${last ? "Voir mon score" : "Suivante →"}</button></div>
+    </div>`;
+  icons(); bindListen($("#quiz-feedback"));
+  $("#quiz-next").onclick = () => { quiz.i += 1; last ? quizResult() : renderQuestion(); };
+  $("#quiz-next").focus();
+}
+
+function quizResult() {
+  const n = quiz.questions.length, s = quiz.score, key = bestKey("quiz");
+  const best = Number(prefGet(key) || 0), record = s > best;
+  if (record) prefSet(key, String(s));
+  const msg = s === n ? "Parfait !" : s >= n * 0.7 ? "Très bien !" : s >= n * 0.4 ? "Pas mal, continuez !" : "Courage, on recommence ?";
+  $("#learn-area").innerHTML = `<div class="w-full max-w-lg text-center space-y-5">
+    <p class="text-5xl">${s === n ? "🏆" : s >= n * 0.7 ? "🎉" : "💪"}</p>
+    <div>
+      <p class="font-display font-bold text-3xl text-slate-900 dark:text-white">${s} / ${n}</p>
+      <p class="mt-1 font-semibold text-slate-700 dark:text-slate-200">${msg}</p>
+      <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Meilleure série : ${quiz.bestStreak} d'affilée${record ? " · Nouveau record !" : best ? ` · Record : ${best}/${n}` : ""}</p>
+    </div>
+    ${quiz.mistakes.length ? `<div class="text-left rounded-2xl border border-slate-200 dark:border-okapi-blue/20 p-4">
+      <p class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">À revoir</p>
+      <ul class="divide-y divide-slate-200 dark:divide-white/10">${quiz.mistakes.map((q) => `<li class="py-2 flex items-center justify-between gap-3 text-sm">
+        <span><b class="text-slate-900 dark:text-white">${esc(q.word)}</b> <span class="text-slate-500 dark:text-slate-400">= ${esc(q.fr)}</span></span>
+        ${listenBtn(q.audio_url || q.tts_url)}</li>`).join("")}</ul></div>` : ""}
+    <div class="flex justify-center gap-3">
+      <button type="button" id="quiz-again" class="${learnBtn}">Rejouer</button>
+      <button type="button" id="quiz-memory" class="${learnBtn2}">Jeu de mémoire</button>
     </div>
   </div>`;
-  $$(".quiz-opt", area).forEach((btn) => btn.addEventListener("click", () => {
-    const ok = q.choices[btn.dataset.i] === q.answer;
-    learnState.step += 1;
-    if (ok) { learnState.score += 1; showToast("Bonne réponse !", "success"); }
-    else showToast(`Réponse attendue : « ${q.answer} »`, "error");
-    showQuiz();
-  }));
+  icons(); bindListen($("#learn-area"));
+  $("#quiz-again").onclick = startQuiz;
+  $("#quiz-memory").onclick = showMemory;
 }
+
+// ----- Jeu de mémoire : retrouver les paires français / langue -----
+const memo = { cards: [], open: [], found: 0, moves: 0, start: 0, timer: null, pairs: [] };
+
+async function showMemory() {
+  setLearnMode("memory");
+  clearInterval(memo.timer);
+  let r;
+  try { r = await api(`/api/learn/memory?lang=${learnLang()}&pairs=6${themeQS()}`); }
+  catch (err) { return learnError(err.message); }
+  memo.pairs = r.pairs;
+  memo.cards = r.pairs.flatMap((p) => [{ id: p.id, side: "fr", text: p.fr }, { id: p.id, side: "word", text: p.word }]);
+  for (let i = memo.cards.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [memo.cards[i], memo.cards[j]] = [memo.cards[j], memo.cards[i]]; }
+  Object.assign(memo, { open: [], found: 0, moves: 0, start: 0, lock: false });
+  renderMemory();
+}
+
+function renderMemory() {
+  const best = prefGet(bestKey("memory")), lang = langName(learnLang());
+  $("#learn-area").innerHTML = `<div class="w-full max-w-2xl space-y-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 text-xs font-bold">
+      <span class="text-slate-500 dark:text-slate-400">Retrouvez chaque mot ${esc(lang.toLowerCase())} et son sens en français</span>
+      <span class="flex gap-2">
+        <span class="px-2.5 py-1 rounded-full bg-blue-100 dark:bg-okapi-blue/15 text-blue-800 dark:text-okapi-cyan">Coups : <span id="memo-moves">${memo.moves}</span></span>
+        <span class="px-2.5 py-1 rounded-full bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-200">⏱ <span id="memo-time">0</span> s</span>
+        ${best ? `<span class="px-2.5 py-1 rounded-full bg-amber-100 dark:bg-okapi-yellow/15 text-amber-700 dark:text-okapi-yellow">Record : ${esc(best)} coups</span>` : ""}
+      </span>
+    </div>
+    <div id="memo-grid" class="grid grid-cols-3 sm:grid-cols-4 gap-2.5">${memo.cards.map((c, i) => `
+      <button type="button" data-i="${i}" class="memo-card relative h-24 sm:h-28 rounded-xl border-2 border-blue-200 dark:border-okapi-blue/30 bg-gradient-to-br from-okapi-blue to-blue-800 text-white font-display font-bold text-2xl flex items-center justify-center p-2 transition-all cursor-pointer hover:scale-[1.02] shadow-sm">?</button>`).join("")}
+    </div>
+  </div>`;
+  $$(".memo-card").forEach((b) => (b.onclick = () => flipMemo(Number(b.dataset.i))));
+}
+
+function showMemoFace(i, state) {
+  const c = memo.cards[i], b = $(`.memo-card[data-i="${i}"]`);
+  if (state === "hidden") {
+    b.className = "memo-card relative h-24 sm:h-28 rounded-xl border-2 border-blue-200 dark:border-okapi-blue/30 bg-gradient-to-br from-okapi-blue to-blue-800 text-white font-display font-bold text-2xl flex items-center justify-center p-2 transition-all cursor-pointer hover:scale-[1.02] shadow-sm";
+    b.innerHTML = "?";
+    return;
+  }
+  const found = state === "found";
+  b.className = `memo-card relative h-24 sm:h-28 rounded-xl border-2 flex flex-col items-center justify-center p-2 text-center transition-all shadow-sm ${found
+    ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-500/15" : "border-okapi-blue bg-white dark:bg-ink-800"}`;
+  const pair = memo.pairs.find((p) => p.id === c.id);
+  b.innerHTML = `<span class="text-[9px] uppercase tracking-widest font-extrabold ${c.side === "fr" ? "text-slate-400" : "text-amber-600 dark:text-okapi-yellow"}">${c.side === "fr" ? "Français" : esc(langName(learnLang()))}</span>
+    <span class="mt-1 text-sm sm:text-base font-bold leading-tight text-slate-900 dark:text-white break-words">${esc(c.text)}</span>
+    ${found && c.side === "word" ? `<span class="l-listen absolute top-1 right-1 w-6 h-6 rounded-full bg-amber-100 dark:bg-okapi-yellow/20 text-amber-800 dark:text-okapi-yellow flex items-center justify-center cursor-pointer" data-url="${esc(pair.audio_url || pair.tts_url)}" title="Écouter"><i data-lucide="volume-2" class="w-3.5 h-3.5"></i></span>` : ""}`;
+  icons(); bindListen(b);
+}
+
+function flipMemo(i) {
+  const c = memo.cards[i];
+  if (memo.lock || c.found || memo.open.includes(i)) return;
+  if (!memo.start) {
+    memo.start = Date.now();
+    memo.timer = setInterval(() => { const t = $("#memo-time"); if (t) t.textContent = Math.round((Date.now() - memo.start) / 1000); }, 500);
+  }
+  memo.open.push(i);
+  showMemoFace(i, "open");
+  if (memo.open.length < 2) return;
+  memo.moves += 1; $("#memo-moves").textContent = memo.moves;
+  const [a, b] = memo.open.map((k) => memo.cards[k]);
+  if (a.id === b.id && a.side !== b.side) {
+    a.found = b.found = true;
+    memo.open.forEach((k) => showMemoFace(k, "found"));
+    memo.open = []; memo.found += 1;
+    if (memo.found === memo.pairs.length) setTimeout(memoryResult, 500);
+  } else {
+    memo.lock = true;
+    setTimeout(() => { memo.open.forEach((k) => showMemoFace(k, "hidden")); memo.open = []; memo.lock = false; }, 1000);
+  }
+}
+
+function memoryResult() {
+  clearInterval(memo.timer);
+  const secs = Math.round((Date.now() - memo.start) / 1000), key = bestKey("memory");
+  const best = Number(prefGet(key) || 0), record = !best || memo.moves < best;
+  if (record) prefSet(key, String(memo.moves));
+  const perfect = memo.moves === memo.pairs.length;
+  $("#learn-area").innerHTML = `<div class="w-full max-w-lg text-center space-y-5">
+    <p class="text-5xl">${perfect ? "🏆" : "🧠"}</p>
+    <div>
+      <p class="font-display font-bold text-2xl text-slate-900 dark:text-white">Bravo, toutes les paires trouvées !</p>
+      <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">${memo.moves} coups · ${secs} secondes${record ? " · Nouveau record !" : ` · Record : ${best} coups`}</p>
+    </div>
+    <div class="text-left rounded-2xl border border-slate-200 dark:border-okapi-blue/20 p-4">
+      <p class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">Les mots du jeu</p>
+      <ul class="divide-y divide-slate-200 dark:divide-white/10">${memo.pairs.map((p) => `<li class="py-2 flex items-center justify-between gap-3 text-sm">
+        <span><b class="text-slate-900 dark:text-white">${esc(p.word)}</b> <span class="text-slate-500 dark:text-slate-400">= ${esc(p.fr)}</span></span>
+        ${listenBtn(p.audio_url || p.tts_url)}</li>`).join("")}</ul></div>
+    <div class="flex justify-center gap-3">
+      <button type="button" id="memo-again" class="${learnBtn}">Rejouer</button>
+      <button type="button" id="memo-quiz" class="${learnBtn2}">Quiz rapide</button>
+    </div>
+  </div>`;
+  icons(); bindListen($("#learn-area"));
+  $("#memo-again").onclick = showMemory;
+  $("#memo-quiz").onclick = showQuizStart;
+}
+
+const showLearn = () => ({ quiz: showQuizStart, memory: showMemory }[learnState.mode] || showCards)();
 
 function initLearn() {
   $("#learn-cards-btn").addEventListener("click", showCards);
-  $("#learn-quiz-btn").addEventListener("click", () => { learnState.score = 0; learnState.step = 0; showQuiz(); });
-  $("#learn-lang").addEventListener("change", () => (learnState.mode === "quiz" ? showQuiz() : showCards()));
+  $("#learn-quiz-btn").addEventListener("click", showQuizStart);
+  $("#learn-memory-btn").addEventListener("click", showMemory);
+  $("#learn-lang").addEventListener("change", async () => { await loadThemes(); showLearn(); });
+  $("#learn-theme").addEventListener("change", showLearn);
 }
-tabLoaders.learn = () => (learnState.mode === "quiz" ? showQuiz() : showCards());
+tabLoaders.learn = async () => { clearInterval(memo.timer); await loadThemes(); showLearn(); };
 
 // ---------- Admin ----------
 const adminCard = "glass-panel rounded-2xl p-4 sm:p-5";
