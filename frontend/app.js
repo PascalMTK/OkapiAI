@@ -350,7 +350,8 @@ function speak(text, lang, ttsUrl, speech) {
 
 // Réponse de traduction
 function translationMeta(r) {
-  const m = { dataset: "Dataset validé", modele: "Modèle IA", mot_a_mot: "Mot à mot (partiel)" }[r.method];
+  const m = { dataset: "Dataset validé", modele: "Modèle IA", mot_a_mot: "Mot à mot (partiel)",
+    lexique: "Dictionnaire", ia: "Traduction IA — peut contenir des erreurs" }[r.method];
   return m ? `${m}${r.confidence ? ` • ${Math.round(r.confidence * 100)} %` : ""}` : "";
 }
 
@@ -365,9 +366,11 @@ function renderTranslation(log, r) {
       <i data-lucide="volume-2" class="w-3.5 h-3.5"></i>${label}</button>`;
   const wordAudio = (r.words || []).filter((w) => w.audio_url);
   const html = `<p class="text-lg font-semibold text-slate-900 dark:text-white">${esc(r.translation)}</p>
+    ${r.alternatives?.length ? `<p class="mt-1 text-xs text-slate-500 dark:text-slate-400">On dit aussi : ${r.alternatives.map((w) => `« ${esc(w)} »`).join(", ")}</p>` : ""}
+    ${r.pron ? `<p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Avec les tons : <span class="italic">${esc(r.pron)}</span></p>` : ""}
     ${r.method === "mot_a_mot" ? `<p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Traduction partielle : les mots entre [ ] sont encore inconnus.</p>` : ""}
-    ${r.audio_url || wordAudio.length ? `<div class="mt-2.5 flex flex-wrap gap-2">
-      ${r.audio_url ? play(r.audio_url, "Écouter l'enregistrement") : ""}
+    ${r.audio_url || r.tts_url || wordAudio.length ? `<div class="mt-2.5 flex flex-wrap gap-2">
+      ${r.audio_url ? play(r.audio_url, "Écouter (voix d'un locuteur)") : r.tts_url ? play(r.tts_url, "Écouter") : ""}
       ${wordAudio.map((w) => play(w.audio_url, esc(w.traduction))).join("")}</div>` : ""}
     ${recordingsBlock(r.recordings)}`;
   bindRecordings(appendBot(log, html, [langName(r.target_lang), translationMeta(r)].filter(Boolean).join(" · ")));
@@ -384,7 +387,23 @@ function renderAnswer(log, lang, userMsg, a, key) {
     base: "Phrase de base — corrigez-la si besoin",
     inconnu: "Mot inconnu — apprenez-le au bot",
   }[a.method] || "";
-  const html = a.reply
+  const trMeta = {
+    dataset: "Traduction validée par la communauté",
+    lexique: "Dictionnaire",
+    ia: "Traduction IA — peut contenir des erreurs",
+    modele: "Modèle de traduction",
+    mot_a_mot: "Mot à mot (partiel)",
+  }[a.method] || "";
+  // Message écrit en français : la traduction, en texte. La voix seulement sur « Écouter ».
+  const trHtml = a.kind === "traduction" && a.reply
+    ? `<p class="text-sm text-slate-600 dark:text-slate-300">« ${esc(a.source)} » en ${esc(langName(lang).toLowerCase())}, c'est :</p>
+       <p class="mt-0.5 text-lg font-semibold text-slate-900 dark:text-white">${esc(a.reply)}</p>
+       ${a.alternatives?.length ? `<p class="mt-1 text-xs text-slate-500 dark:text-slate-400">On dit aussi : ${a.alternatives.map((w) => `« ${esc(w)} »`).join(", ")}</p>` : ""}
+       ${a.pron ? `<p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Avec les tons : <span class="italic">${esc(a.pron)}</span></p>` : ""}
+       ${a.method === "mot_a_mot" ? `<p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Traduction partielle : les mots entre [ ] sont encore inconnus.</p>` : ""}
+       ${recordingsBlock(a.recordings)}`
+    : null;
+  const html = trHtml ?? (a.reply
     ? `<p class="text-base font-semibold">${esc(a.reply)}</p>
        ${a.reply_fr ? `<details class="mt-1 text-xs text-slate-500 dark:text-slate-400"><summary class="cursor-pointer text-blue-700 dark:text-okapi-cyan font-semibold">🇫🇷 En français</summary><p class="mt-1 italic">${esc(a.reply_fr)}</p></details>` : ""}
        ${audioTag(a.audio_url)}
@@ -394,11 +413,11 @@ function renderAnswer(log, lang, userMsg, a, key) {
           <span class="block text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">${esc(a.example.source)}</span>
           ${audioTag(a.example.audio_url)}</div>` : ""}
        ${recordingsBlock(a.recordings)}`
-    : `<p>🤔 ${esc(a.hint || "Je ne sais pas encore répondre.")}</p>${recordingsBlock(a.recordings)}`;
+    : `<p>🤔 ${esc(a.hint || "Je ne sais pas encore répondre.")}</p>${recordingsBlock(a.recordings)}`);
   const listen = a.reply && (a.tts_url || a.audio_url)
-    ? `<button type="button" class="b-listen ${smallBtn}"><i data-lucide="volume-2" class="w-3.5 h-3.5"></i>Écouter</button>` : "";
+    ? `<button type="button" class="b-listen ${smallBtn}"><i data-lucide="volume-2" class="w-3.5 h-3.5"></i>${a.audio_url ? "Écouter (voix d'un locuteur)" : "Écouter"}</button>` : "";
   const body = appendBot(log, html + `<div class="mt-2.5 flex flex-wrap gap-2">${listen}<button type="button" class="b-teach ${smallBtn}">
-      <i data-lucide="${a.reply ? "pencil" : "graduation-cap"}" class="w-3.5 h-3.5"></i>${a.reply ? "Corriger" : "Apprendre une réponse"}</button></div>`, meta);
+      <i data-lucide="${a.reply ? "pencil" : "graduation-cap"}" class="w-3.5 h-3.5"></i>${a.reply ? "Corriger" : "Apprendre une réponse"}</button></div>`, trHtml ? trMeta : meta);
   $(".b-teach", body).onclick = () => showTeach(body, lang, userMsg, a.reply);
   bindRecordings(body);
   const say = () => (a.audio_url ? playUrl(a.audio_url) : speak(a.reply, lang, a.tts_url, a.speech));
@@ -406,7 +425,8 @@ function renderAnswer(log, lang, userMsg, a, key) {
   if (!a.reply) return Promise.resolve();
   convHistory[key].push({ role: "user", text: userMsg }, { role: "assistant", text: a.reply });
   convHistory[key] = convHistory[key].slice(-20);
-  return say();  // OkapiAI répond à voix haute
+  // Pas de voix automatique dans le chat écrit : on écoute en cliquant sur « Écouter »
+  return Promise.resolve();
 }
 
 function showTeach(body, lang, msg, current) {

@@ -13,6 +13,7 @@ Chaque réponse peut être corrigée par l'utilisateur -> nouvelle contribution 
 qui suivra la règle des 10 personnes + validation admin.
 """
 import re
+import unicodedata
 from typing import Optional
 
 from sqlalchemy import or_, select
@@ -25,7 +26,7 @@ from . import translator
 from .basics import basic_reply
 from .corpus import corpus, corpus_lua
 from .vocab_lua import vocab_lua
-from .lexicon import key, lexicon
+from .lexicon import COMMON_FR, key, lexicon
 from .llm import claude_chat
 
 MAX_EXAMPLES = 25
@@ -120,6 +121,96 @@ def answer_phrase(db: Session, lang: str, phrase: str) -> dict:
         return out
     if t.get("translation"):
         out.update(reply=t["translation"], method=t["method"])
+    return out
+
+
+# ---------- Message écrit en français : on donne sa traduction ----------
+# « bonjour » -> « Bonjour » en lingala, c'est « Mbote » ; « je vais au marché » -> « Nazali kokende na zando »
+_FR_STOP = set("""je j moi me m tu toi il elle on nous vous ils elles le la les l un une des du de d au aux et ou
+est suis es sommes etes sont ai as avons avez ont vais vas va allons allez vont mon ma mes ton ta tes son sa ses
+notre votre nos vos leur leurs ce cet cette ces c qui que qu quoi quand comment pourquoi ou dans pour avec sans
+sur sous chez pas ne n plus tres bien bonjour bonsoir salut merci oui non suis veux veut peux peut fait faire
+aussi mais donc car tout tous toute toutes rien beaucoup peu ici la-bas aujourd'hui demain hier""".split())
+_ELISION = re.compile(r"^(?:l|d|j|m|t|s|n|c|qu)'")
+
+
+def _tokens(message: str) -> list[str]:
+    return [_ELISION.sub("", w) for w in key(re.sub(r"[?!.,;:«»\"“”()]", " ", message.replace("’", "'"))).split()]
+
+
+def looks_french(lang: str, message: str) -> bool:
+    """Le message est-il écrit en français (et non dans la langue de la conversation) ?"""
+    from .hearing import for_lang
+    toks = [t for t in _tokens(message) if t]
+    if not toks or len(toks) > 30:
+        return False
+    h = for_lang(lang)
+    if h is not None:
+        h._load()
+    national_words = h._freq if h is not None else {}
+    french_words = (h._french if h is not None else set()) | {key(f) for f in COMMON_FR}
+
+    def national(t):
+        if t in _FR_STOP or t in french_words:
+            return False
+        return t in national_words or (lang == "ln" and bool(lexicon.lookup(t, fuzzy=False)[1]))
+
+    fr = sum(1 for t in toks if t in _FR_STOP or t in french_words)
+    nat = sum(1 for t in toks if national(t))
+    if len(toks) <= 2 and nat == 0:
+        return True     # un mot qui n'est pas de la langue : « piscine », « rivière »
+    return fr > nat and fr >= len(toks) / 2
+
+
+def _plain(text: str) -> str:
+    """Écriture courante, sans les tons du dictionnaire : mbɔ́ngɔ -> mbongo."""
+    t = unicodedata.normalize("NFD", text)
+    t = "".join(c for c in t if not unicodedata.combining(c))
+    for a, b in (("ɔ", "o"), ("ɛ", "e"), ("Ɔ", "O"), ("Ɛ", "E")):
+        t = t.replace(a, b)
+    return unicodedata.normalize("NFC", t)
+
+
+def _cap(s: str) -> str:
+    return s[:1].upper() + s[1:] if s else s
+
+
+def translate_french(db: Session, lang: str, text: str) -> dict:
+    """Traduction d'un mot ou d'une phrase française, et rien d'autre (aucune conversation) :
+    dataset validé (avec l'enregistrement d'un locuteur), puis dictionnaire, puis IA guidée par
+    le dictionnaire, puis modèle / mot à mot."""
+    source = text.strip(" ?!.").strip()
+    out = {"reply": None, "reply_fr": _cap(source), "method": None, "audio_url": None, "word": None,
+           "example": None, "kind": "traduction", "source": _cap(source), "alternatives": [], "pron": None}
+    t = translator.translate(db, source, "fr", lang)
+    if t["method"] == "dataset":
+        out.update(reply=_cap(t["translation"]), method="dataset", audio_url=t.get("audio_url"))
+        return out
+    # mot ou courte expression : le dictionnaire (« argent » -> mbongo, « la rivière » -> ebale)
+    toks = _tokens(source)
+    if 1 <= len(toks) <= 4:
+        candidates = [source, " ".join(toks)]
+        if len(toks) >= 2 and toks[0] in {"le", "la", "les", "un", "une", "des", "du", "de", "au", "aux"}:
+            candidates.append(" ".join(toks[1:]))
+        for c in candidates:
+            words = lexicon.reverse(c) if lang == "ln" else vocab_lua.reverse(c) if lang == "lua" else []
+            if words:
+                first = _plain(words[0])
+                out.update(reply=_cap(first), method="lexique",
+                           alternatives=[_plain(w) for w in words[1:3] if _plain(w) != first],
+                           pron=words[0] if words[0] != first else None)
+                return out
+    out.update({k: v for k, v in answer_phrase(db, lang, source).items() if k in ("reply", "method", "audio_url")})
+    if out["reply"] and out["method"] != "dataset":
+        out["reply"] = _plain(out["reply"])   # « Nakei na zándo » -> « Nakei na zando »
+    if out["reply"] is None and lang == "ln":   # sans IA : mot à mot avec le dictionnaire
+        parts, found = [], 0
+        for w in toks:
+            tr = lexicon.reverse(w) if w not in _FR_STOP else []
+            parts.append(_plain(tr[0]) if tr else f"[{w}]")
+            found += bool(tr)
+        if found:
+            out.update(reply=_cap(" ".join(parts)), method="mot_a_mot")
     return out
 
 
@@ -256,13 +347,20 @@ def converse(db: Session, lang: str, message: str, history: list[dict], voice: b
 
     # 0. « Que veut dire … ? » / « Comment dit-on … ? »
     question = parse_word_question(message)
+    if question and question[0] == "traduire" and looks_french(lang, question[1]):
+        out.update(translate_french(db, lang, question[1]))
+        return out
     if question:
         out.update(answer_word_question(db, lang, *question, history))
         return out
     # « je vais au marché en lingala » : la traduction de la phrase, sans rien ajouter
     phrase = parse_phrase_request(message)
     if phrase:
-        out.update(answer_phrase(db, lang, phrase))
+        out.update(translate_french(db, lang, phrase))
+        return out
+    # Écrit en français (« argent », « je vais au marché ») : on donne la traduction, en texte
+    if not voice and looks_french(lang, message):
+        out.update(translate_french(db, lang, message))
         return out
 
     # 1. Dialogue validé

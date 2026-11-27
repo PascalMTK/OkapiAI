@@ -50,6 +50,7 @@ COMMON_FR = {
     "ecrire": ["kokoma"], "lire": ["kotánga"], "apprendre": ["koyékola"], "comprendre": ["kososola"],
     "savoir": ["koyéba"], "vouloir": ["kolinga"], "voir": ["komona"], "entendre": ["koyóka"],
     "maintenant": ["sikóyo"], "toujours": ["ntángo nyɔ́nsɔ"], "pere": ["tatá"], "mere": ["mamá"],
+    "riviere": ["ebale", "molúká"], "fleuve": ["ebale"],
     "frere": ["ndeko ya mobáli"], "soeur": ["ndeko ya mwási"], "nom": ["nkómbo"],
 }
 

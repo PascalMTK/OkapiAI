@@ -127,7 +127,15 @@ def chat(body: TranslateIn, db: Session = Depends(get_db)):
     check_langs(body.source_lang, body.target_lang, require_congolese=False)
     res = translator.translate(db, body.text, body.source_lang, body.target_lang)
     tgt = LANGUAGES[body.target_lang]
-    if res["method"] == "dataset":
+    if body.source_lang == "fr" and body.target_lang in CONGOLESE and res["method"] != "dataset":
+        # français -> langue nationale : dictionnaire, puis IA guidée par le dictionnaire
+        t = conversation.translate_french(db, body.target_lang, body.text)
+        if t["reply"]:
+            res.update(translation=t["reply"], method=t["method"], audio_url=t["audio_url"],
+                       confidence=None, words=[], alternatives=t["alternatives"], pron=t["pron"])
+    if res["method"] in ("lexique", "ia"):
+        reply = f"En {tgt} : « {res['translation']} »"
+    elif res["method"] == "dataset":
         reply = f"En {tgt} : « {res['translation']} »"
     elif res["method"] == "modele":
         reply = f"En {tgt} (traduction du modèle) : « {res['translation']} »"
@@ -140,7 +148,10 @@ def chat(body: TranslateIn, db: Session = Depends(get_db)):
     # phrases enregistrées du côté de la langue nationale (la cible, sinon la source)
     nat, text = ((body.target_lang, res.get("translation") or body.text) if body.target_lang in CONGOLESE
                  else (body.source_lang, body.text))
-    return {"reply": reply, **res,
+    # « Écouter » : la voix d'OkapiAI dit la traduction (seulement si on clique)
+    voice_url = tts_url(res["translation"], body.target_lang) if res.get("translation") and \
+        body.target_lang in CONGOLESE and res["method"] != "mot_a_mot" else None
+    return {"reply": reply, **res, "tts_url": voice_url,
             "recordings": recordings.for_message(db, nat, text, exclude={res.get("translation") or ""}),
             "recordings_lang": nat}
 

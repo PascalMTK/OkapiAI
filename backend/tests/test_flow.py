@@ -228,13 +228,22 @@ def test_word_meaning():
         r = ask("mbɔ́tɛ elingi koloba nini?")  # avec les tons
         assert r["method"] == "lexique" and "bonjour" in r["reply"]
 
+        # « comment dit-on X » : la traduction seule, en écriture courante (les tons à part)
         r = ask("Comment dit-on maison en lingala ?")
-        assert r["method"] == "lexique" and "ndáko" in r["reply"] and r["reply"].startswith("Na lingala")
+        assert r["method"] == "lexique" and r["kind"] == "traduction" and r["reply"] == "Ndako", r
+        assert r["pron"] == "ndáko" and r["tts_url"]
 
         # « comment dit-on merci », aussi demandé en lingala : l'usage courant (matondo), pas l'emprunt rare
         for q in ("Ndenge nini nakoloba 'merci' na lingala?", "merci en lingala c'est quoi ?"):
             r = ask(q)
-            assert r["method"] == "lexique" and "matɔ́ndɔ" in r["reply"], r
+            assert r["method"] == "lexique" and r["reply"] == "Matondo", r
+
+        # écrit simplement en français : la traduction, pas une conversation
+        for q, want in (("bonjour", "Mbote"), ("argent", "Mbongo"), ("rivière", "Ebale"), ("le marché", "Zando")):
+            r = ask(q)
+            assert r["kind"] == "traduction" and r["reply"] == want, r
+        r = ask("mbote")   # du lingala : on converse
+        assert r.get("kind") != "traduction", r
         r = ask("ndako na lingala ezali nini ?")  # déjà du lingala : on donne son sens
         assert r["method"] == "lexique" and "maison" in r["reply"], r
 
